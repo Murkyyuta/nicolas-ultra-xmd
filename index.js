@@ -245,9 +245,7 @@ async function startBot() {
     const {
       state,
       saveCreds
-    } = await useMultiFileAuthState(
-      AUTH_DIR
-    );
+    } = await useMultiFileAuthState(AUTH_DIR);
 
     const {
       version
@@ -258,9 +256,13 @@ async function startBot() {
       version.join(".")
     );
 
+    console.log(
+      "📱 Session déjà enregistrée :",
+      state.creds.registered
+    );
+
     sock = makeWASocket({
       version,
-
       auth: state,
 
       logger: pino({
@@ -269,10 +271,13 @@ async function startBot() {
 
       printQRInTerminal: false,
 
+      // Navigateur standard pour éviter
+      // les problèmes de pairing liés
+      // aux identifiants personnalisés.
       browser: [
-        "Nicolas Ultra XMD",
+        "Ubuntu",
         "Chrome",
-        "1.0.0"
+        "22.04.4"
       ],
 
       connectTimeoutMs: 120000,
@@ -296,31 +301,52 @@ async function startBot() {
     );
 
     // ═══════════════════════════════════
-    // 🔌 CONNEXION
+    // 🔌 CONNEXION WHATSAPP
     // ═══════════════════════════════════
 
     sock.ev.on(
       "connection.update",
       async update => {
+
+        // Affichage complet pour diagnostic
+        console.log(
+          "📡 UPDATE WHATSAPP :",
+          JSON.stringify(
+            update,
+            null,
+            2
+          )
+        );
+
         const {
           connection,
-          lastDisconnect
+          lastDisconnect,
+          qr
         } = update;
 
         console.log(
           "📡 Connection state :",
-          connection
+          connection || "undefined"
+        );
+
+        console.log(
+          "📡 QR reçu :",
+          Boolean(qr)
         );
 
         // ═══════════════════════════════
-        // 📱 PAIRING
+        // 📱 PAIRING CODE
         // ═══════════════════════════════
 
         if (
-          connection === "connecting" &&
           !state.creds.registered &&
-          !pairingRequested
+          !pairingRequested &&
+          (
+            connection === "connecting" ||
+            Boolean(qr)
+          )
         ) {
+
           pairingRequested = true;
 
           const phoneNumber =
@@ -332,97 +358,164 @@ async function startBot() {
           );
 
           if (!phoneNumber) {
+
             console.error(
               "❌ PAIRING_NUMBER MANQUANT"
             );
 
+            pairingRequested = false;
             starting = false;
+
             return;
           }
 
           const cleanNumber =
-            phoneNumber.replace(/\D/g, "");
+            phoneNumber.replace(
+              /\D/g,
+              ""
+            );
+
+          if (!cleanNumber) {
+
+            console.error(
+              "❌ PAIRING_NUMBER INVALIDE"
+            );
+
+            pairingRequested = false;
+            starting = false;
+
+            return;
+          }
 
           console.log(
-            "📱 Numéro de pairing détecté"
+            "📱 Numéro de pairing détecté."
           );
 
-          // Petite attente + vérification
-          // avant la demande du code.
-          pairingTimeout = setTimeout(
-            async () => {
-              try {
-                console.log(
-                  "🔄 Demande du pairing code..."
-                );
+          console.log(
+            "🔄 Attente du socket WhatsApp..."
+          );
 
-                const code =
-                  await sock.requestPairingCode(
-                    cleanNumber
+          pairingTimeout =
+            setTimeout(
+              async () => {
+
+                try {
+
+                  if (
+                    state.creds.registered
+                  ) {
+                    console.log(
+                      "ℹ️ Session déjà enregistrée."
+                    );
+
+                    return;
+                  }
+
+                  console.log(
+                    "🔄 Demande du pairing code..."
                   );
 
-                console.log("");
-                console.log(
-                  "━━━━━━━━━━━━━━━━━━━━━━╮"
-                );
-                console.log(
-                  "┃ 🔥 PAIRING CODE"
-                );
-                console.log(
-                  `┃    ${code}`
-                );
-                console.log(
-                  "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-                );
-                console.log("");
-                console.log(
-                  "📱 WhatsApp → Paramètres"
-                );
-                console.log(
-                  "➡️ Appareils connectés"
-                );
-                console.log(
-                  "➡️ Connecter un appareil"
-                );
-                console.log(
-                  "➡️ Utiliser un numéro de téléphone"
-                );
-                console.log("");
-              } catch (error) {
-                console.error("");
-                console.error(
-                  "❌ ERREUR PAIRING CODE"
-                );
-                console.error(error);
-                console.error("");
+                  const code =
+                    await sock.requestPairingCode(
+                      cleanNumber
+                    );
 
-                if (
-                  error?.output?.statusCode
-                ) {
+                  console.log("");
+                  console.log(
+                    "━━━━━━━━━━━━━━━━━━━━━━╮"
+                  );
+                  console.log(
+                    "┃ 🔥 PAIRING CODE"
+                  );
+                  console.log(
+                    `┃    ${code}`
+                  );
+                  console.log(
+                    "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+                  );
+                  console.log("");
+
+                  console.log(
+                    "📱 WhatsApp → Paramètres"
+                  );
+
+                  console.log(
+                    "➡️ Appareils connectés"
+                  );
+
+                  console.log(
+                    "➡️ Connecter un appareil"
+                  );
+
+                  console.log(
+                    "➡️ Utiliser un numéro de téléphone"
+                  );
+
+                  console.log("");
+
+                  console.log(
+                    "⚠️ Entre le code rapidement."
+                  );
+
+                } catch (error) {
+
+                  console.error("");
                   console.error(
-                    "📛 Status :",
-                    error.output.statusCode
+                    "❌ ERREUR PAIRING CODE"
                   );
+
+                  console.error(
+                    error?.message ||
+                    error
+                  );
+
+                  if (
+                    error?.output?.statusCode
+                  ) {
+                    console.error(
+                      "📛 Status :",
+                      error.output.statusCode
+                    );
+                  }
+
+                  if (
+                    error?.data?.statusCode
+                  ) {
+                    console.error(
+                      "📛 Data status :",
+                      error.data.statusCode
+                    );
+                  }
+
+                  console.error("");
+
+                  pairingRequested = false;
                 }
 
-                pairingRequested = false;
-              }
-            },
-            3000
-          );
+              },
+              1500
+            );
         }
 
         // ═══════════════════════════════
         // 🟢 CONNECTÉ
         // ═══════════════════════════════
 
-        if (connection === "open") {
+        if (
+          connection === "open"
+        ) {
+
           if (pairingTimeout) {
-            clearTimeout(pairingTimeout);
+
+            clearTimeout(
+              pairingTimeout
+            );
+
             pairingTimeout = null;
           }
 
           starting = false;
+
           pairingRequested = false;
 
           console.log("");
@@ -442,17 +535,32 @@ async function startBot() {
             "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
           );
           console.log("");
+
+          try {
+
+            await sock.sendPresenceUpdate(
+              "available"
+            );
+
+          } catch {}
         }
 
         // ═══════════════════════════════
         // 🔴 FERMETURE
         // ═══════════════════════════════
 
-        if (connection === "close") {
+        if (
+          connection === "close"
+        ) {
+
           starting = false;
 
           if (pairingTimeout) {
-            clearTimeout(pairingTimeout);
+
+            clearTimeout(
+              pairingTimeout
+            );
+
             pairingTimeout = null;
           }
 
@@ -482,11 +590,18 @@ async function startBot() {
 
           console.log(
             "📛 Erreur :",
-            error?.message || "inconnue"
+            error?.message ||
+            "inconnue"
           );
 
-          // 401 = session invalide
-          if (statusCode === 401) {
+          // ═════════════════════════════
+          // 401 = SESSION INVALIDE
+          // ═════════════════════════════
+
+          if (
+            statusCode === 401
+          ) {
+
             console.log(
               "⚠️ Session WhatsApp invalide."
             );
@@ -494,9 +609,13 @@ async function startBot() {
             pairingRequested = false;
 
             try {
+
               if (
-                fs.existsSync(AUTH_DIR)
+                fs.existsSync(
+                  AUTH_DIR
+                )
               ) {
+
                 fs.rmSync(
                   AUTH_DIR,
                   {
@@ -509,7 +628,9 @@ async function startBot() {
                   "🧹 Ancienne session supprimée."
                 );
               }
+
             } catch (e) {
+
               console.error(
                 "⚠️ Nettoyage impossible :",
                 e.message
@@ -517,37 +638,66 @@ async function startBot() {
             }
           }
 
-          // 428 = connexion fermée
-          // avant la requête pairing
-          if (statusCode === 428) {
+          // ═════════════════════════════
+          // 428 = SOCKET FERMÉ
+          // ═════════════════════════════
+
+          if (
+            statusCode === 428
+          ) {
+
             console.log(
-              "⚠️ WhatsApp/Baileys a fermé la connexion avant le pairing."
+              "⚠️ WhatsApp/Baileys a fermé le socket."
+            );
+
+            console.log(
+              "🔄 Nouvelle tentative..."
             );
 
             pairingRequested = false;
           }
 
+          // ═════════════════════════════
+          // LOGGED OUT
+          // ═════════════════════════════
+
           if (
             statusCode ===
             DisconnectReason.loggedOut
           ) {
+
             console.log(
-              "🚪 Session déconnectée."
+              "🚪 Session déconnectée définitivement."
             );
+
             return;
           }
 
-          if (!reconnectTimer) {
+          // ═════════════════════════════
+          // RECONNEXION
+          // ═════════════════════════════
+
+          if (
+            !reconnectTimer
+          ) {
+
             console.log(
               "🔄 Reconnexion dans 5 secondes..."
             );
 
             reconnectTimer =
-              setTimeout(() => {
-                reconnectTimer = null;
-                pairingRequested = false;
-                startBot();
-              }, 5000);
+              setTimeout(
+                () => {
+
+                  reconnectTimer = null;
+
+                  pairingRequested = false;
+
+                  startBot();
+
+                },
+                5000
+              );
           }
         }
       }
@@ -560,12 +710,21 @@ async function startBot() {
     sock.ev.on(
       "messages.upsert",
       async ({ messages }) => {
+
         try {
-          const message = messages[0];
+
+          const message =
+            messages[0];
 
           if (!message) return;
-          if (message.key.fromMe) return;
-          if (!message.message) return;
+
+          if (
+            message.key.fromMe
+          ) return;
+
+          if (
+            !message.message
+          ) return;
 
           const jid =
             message.key.remoteJid;
@@ -583,9 +742,9 @@ async function startBot() {
           const isGroup =
             isGroupJid(jid);
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 👋 RÉPONSES RAPIDES
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
           if (
             [
@@ -595,10 +754,14 @@ async function startBot() {
               "bonjour"
             ].includes(lower)
           ) {
-            await sock.sendMessage(jid, {
-              text:
-                "🔥 Salut ! Nicolas Ultra XMD est là 🍫🎻"
-            });
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "🔥 Salut ! Nicolas Ultra XMD est là 🍫🎻"
+              }
+            );
 
             return;
           }
@@ -610,23 +773,25 @@ async function startBot() {
               "ca va"
             ].includes(lower)
           ) {
-            await sock.sendMessage(jid, {
-              text:
-                "Ça va tranquille 😎🔥 et toi ? 🍫🎻"
-            });
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "Ça va tranquille 😎🔥 et toi ? 🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 📌 COMMANDES
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
           if (
             !text.startsWith(PREFIX)
-          ) {
-            return;
-          }
+          ) return;
 
           const body =
             text
@@ -645,14 +810,21 @@ async function startBot() {
 
           const args = parts;
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🎀 MENU
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "menu") {
-            await sock.sendMessage(jid, {
-              text: menuText()
-            });
+          if (
+            command === "menu"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  menuText()
+              }
+            );
 
             const reactions = [
               "🎀",
@@ -668,6 +840,7 @@ async function startBot() {
             for (
               const emoji of reactions
             ) {
+
               await sleep(350);
 
               await react(
@@ -681,115 +854,158 @@ async function startBot() {
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🟢 ALIVE
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "alive") {
-            await sock.sendMessage(jid, {
-              text:
-                `🔥 *${BOT_NAME} EST EN LIGNE*\n\n` +
-                `⚔️ Version : ${VERSION}\n` +
-                `👑 Owner : ${OWNER_NAME}\n` +
-                `🟢 Status : Online\n\n` +
-                `🍫🎻`
-            });
+          if (
+            command === "alive"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🔥 *${BOT_NAME} EST EN LIGNE*\n\n` +
+                  `⚔️ Version : ${VERSION}\n` +
+                  `👑 Owner : ${OWNER_NAME}\n` +
+                  `🟢 Status : Online\n\n` +
+                  `🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🏓 PING
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "ping") {
+          if (
+            command === "ping"
+          ) {
+
             const start =
               Date.now();
 
-            await sock.sendMessage(jid, {
-              text:
-                "🏓 Calcul..."
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "🏓 Calcul..."
+              }
+            );
 
             const ping =
               Date.now() - start;
 
-            await sock.sendMessage(jid, {
-              text:
-                `🏓 Pong !\n⚡ ${ping} ms\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🏓 Pong !\n⚡ ${ping} ms\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // ⚡ SPEED
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "speed") {
+          if (
+            command === "speed"
+          ) {
+
             const start =
               Date.now();
 
-            await sock.sendMessage(jid, {
-              text:
-                `⚡ Speed : ${
-                  Date.now() - start
-                } ms\n🍫🎻`
-            });
+            const speed =
+              Date.now() - start;
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `⚡ Speed : ${speed} ms\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 👑 OWNER
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "owner") {
-            await sock.sendMessage(jid, {
-              text:
-                `👑 *OWNER*\n\n` +
-                `🔥 ${OWNER_NAME}\n` +
-                `📱 WhatsApp : +${OWNER_NUMBER}\n` +
-                `✈️ Telegram : ${OWNER_TELEGRAM}\n\n` +
-                `🍫🎻`
-            });
+          if (
+            command === "owner"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `👑 *OWNER*\n\n` +
+                  `🔥 ${OWNER_NAME}\n` +
+                  `📱 WhatsApp : +${OWNER_NUMBER}\n` +
+                  `✈️ Telegram : ${OWNER_TELEGRAM}\n\n` +
+                  `🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🔗 REPO
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "repo") {
-            await sock.sendMessage(jid, {
-              text:
-                "🔥 Nicolas Ultra XMD\n" +
-                "⚔️ Shadow Monarch Edition\n" +
-                "📦 GitHub : nicolas-ultra-xmd\n\n" +
-                "🍫🎻"
-            });
+          if (
+            command === "repo"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "🔥 Nicolas Ultra XMD\n" +
+                  "⚔️ Shadow Monarch Edition\n" +
+                  "📦 GitHub : nicolas-ultra-xmd\n\n" +
+                  "🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🎨 THEME
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "theme") {
+          if (
+            command === "theme"
+          ) {
+
             const theme =
               args[0]?.toLowerCase();
 
             if (!theme) {
-              await sock.sendMessage(jid, {
-                text:
-                  "🎨 *THÈMES DISPONIBLES*\n\n" +
-                  THEMES
-                    .map(t => `• ${t}`)
-                    .join("\n") +
-                  "\n\nExemple : .theme solo\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "🎨 *THÈMES DISPONIBLES*\n\n" +
+                    THEMES
+                      .map(
+                        t => `• ${t}`
+                      )
+                      .join("\n") +
+                    "\n\nExemple : .theme solo\n🍫🎻"
+                }
+              );
 
               return;
             }
@@ -797,29 +1013,39 @@ async function startBot() {
             if (
               !THEMES.includes(theme)
             ) {
-              await sock.sendMessage(jid, {
-                text:
-                  "❌ Thème inconnu.\n\n" +
-                  THEMES.join(", ") +
-                  "\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "❌ Thème inconnu.\n\n" +
+                    THEMES.join(", ") +
+                    "\n🍫🎻"
+                }
+              );
 
               return;
             }
 
-            await sock.sendMessage(jid, {
-              text:
-                `🎨 Thème activé : *${theme}*\n⚔️ Shadow Monarch !\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🎨 Thème activé : *${theme}*\n⚔️ Shadow Monarch !\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🎱 8BALL
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "8ball") {
+          if (
+            command === "8ball"
+          ) {
+
             const answers = [
               "Oui 😎",
               "Non 😂",
@@ -830,40 +1056,50 @@ async function startBot() {
               "Les étoiles disent oui ✨"
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `🎱 ${randomItem(
-                  answers
-                )}\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🎱 ${randomItem(
+                    answers
+                  )}\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🪙 COINFLIP
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
           if (
             command === "coinflip"
           ) {
-            await sock.sendMessage(jid, {
-              text:
-                `🪙 Résultat : *${
-                  Math.random() > 0.5
-                    ? "PILE"
-                    : "FACE"
-                }*\n🍫🎻`
-            });
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🪙 Résultat : *${
+                    Math.random() > 0.5
+                      ? "PILE"
+                      : "FACE"
+                  }*\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🎲 ROLL
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "roll") {
+          if (
+            command === "roll"
+          ) {
+
             const max =
               parseInt(args[0]) || 6;
 
@@ -872,217 +1108,289 @@ async function startBot() {
                 Math.random() * max
               ) + 1;
 
-            await sock.sendMessage(jid, {
-              text:
-                `🎲 Résultat : *${result}*\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `🎲 Résultat : *${result}*\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 😂 BLAGUE
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
           if (
             command === "joke" ||
             command === "blague"
           ) {
+
             const jokes = [
               "Pourquoi les développeurs aiment le dark mode ? Parce que la lumière attire les bugs. 💀",
               "Mon code fonctionne parfaitement... jusqu'à ce que quelqu'un le regarde. 😭",
               "Pourquoi le bot est célibataire ? Parce qu'il n'a pas de connexion. 😂"
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `😂 ${randomItem(
-                  jokes
-                )}\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `😂 ${randomItem(
+                    jokes
+                  )}\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // ❤️ LOVE
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "love") {
-            await sock.sendMessage(jid, {
-              text:
-                "❤️ L'amour c'est compliqué frère... mais ça vaut parfois le coup. 😭❤️\n🍫🎻"
-            });
+          if (
+            command === "love"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "❤️ L'amour c'est compliqué frère... mais ça vaut parfois le coup. 😭❤️\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 😎 COMPLIMENT
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
           if (
             command === "compliment"
           ) {
-            await sock.sendMessage(jid, {
-              text:
-                "😎 T'as une énergie de personnage principal 🔥\n🍫🎻"
-            });
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "😎 T'as une énergie de personnage principal 🔥\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 😏 FLIRT
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "flirt") {
-            await sock.sendMessage(jid, {
-              text:
-                "😏 Si le charme était une commande, tu serais déjà admin. 😂❤️\n🍫🎻"
-            });
+          if (
+            command === "flirt"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "😏 Si le charme était une commande, tu serais déjà admin. 😂❤️\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🤗 HUG
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "hug") {
-            await sock.sendMessage(jid, {
-              text:
-                "🤗 Câlin virtuel envoyé !\n🍫🎻"
-            });
+          if (
+            command === "hug"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "🤗 Câlin virtuel envoyé !\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 💋 KISS
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "kiss") {
-            await sock.sendMessage(jid, {
-              text:
-                "💋 Bisou virtuel envoyé 😭❤️\n🍫🎻"
-            });
+          if (
+            command === "kiss"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "💋 Bisou virtuel envoyé 😭❤️\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 👋 SLAP
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "slap") {
-            await sock.sendMessage(jid, {
-              text:
-                "👋 PAF ! Réveille-toi frère 😂\n🍫🎻"
-            });
+          if (
+            command === "slap"
+          ) {
+
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  "👋 PAF ! Réveille-toi frère 😂\n🍫🎻"
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🧠 FACT
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "fact") {
+          if (
+            command === "fact"
+          ) {
+
             const facts = [
               "🧠 Les poulpes ont trois cœurs.",
               "🌍 La Terre tourne autour du Soleil.",
               "🐙 Les poulpes peuvent changer de couleur."
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `${randomItem(
-                  facts
-                )}\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `${randomItem(
+                    facts
+                  )}\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // ✋ TRUTH
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "truth") {
+          if (
+            command === "truth"
+          ) {
+
             const truths = [
               "👀 Qui est ton crush ?",
               "😂 Quelle est ta plus grosse honte ?",
               "❤️ As-tu déjà aimé quelqu'un en secret ?"
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `✋ ${randomItem(
-                  truths
-                )}\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `✋ ${randomItem(
+                    truths
+                  )}\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 😈 DARE
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "dare") {
+          if (
+            command === "dare"
+          ) {
+
             const dares = [
               "😂 Envoie un emoji au hasard à la dernière personne à qui tu as parlé.",
               "🔥 Change ta photo de profil pendant 5 minutes.",
               "💀 Écris « je suis un génie » dans le groupe."
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `😈 ${randomItem(
-                  dares
-                )}\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `😈 ${randomItem(
+                    dares
+                  )}\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // ✊ RPS
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "rps") {
+          if (
+            command === "rps"
+          ) {
+
             const choices = [
               "pierre",
               "papier",
               "ciseaux"
             ];
 
-            await sock.sendMessage(jid, {
-              text:
-                `✊ Mon choix : *${
-                  randomItem(
-                    choices
-                  )
-                }*\n🍫🎻`
-            });
+            await sock.sendMessage(
+              jid,
+              {
+                text:
+                  `✊ Mon choix : *${
+                    randomItem(
+                      choices
+                    )
+                  }*\n🍫🎻`
+              }
+            );
 
             return;
           }
 
-          // ═══════════════════════════════
+          // ═════════════════════════════
           // 🧮 MATH
-          // ═══════════════════════════════
+          // ═════════════════════════════
 
-          if (command === "math") {
+          if (
+            command === "math"
+          ) {
+
             const expression =
               args.join(" ");
 
             if (!expression) {
-              await sock.sendMessage(jid, {
-                text:
-                  "🧮 Exemple : .math 25 + 25\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "🧮 Exemple : .math 25 + 25\n🍫🎻"
+                }
+              );
 
               return;
             }
@@ -1092,37 +1400,50 @@ async function startBot() {
                 expression
               )
             ) {
-              await sock.sendMessage(jid, {
-                text:
-                  "❌ Expression invalide.\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "❌ Expression invalide.\n🍫🎻"
+                }
+              );
 
               return;
             }
 
             try {
+
               const result =
                 Function(
                   `"use strict"; return (${expression})`
                 )();
 
-              await sock.sendMessage(jid, {
-                text:
-                  `🧮 ${expression} = *${result}*\n🍫🎻`
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `🧮 ${expression} = *${result}*\n🍫🎻`
+                }
+              );
+
             } catch {
-              await sock.sendMessage(jid, {
-                text:
-                  "❌ Impossible de calculer.\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "❌ Impossible de calculer.\n🍫🎻"
+                }
+              );
             }
 
             return;
           }
 
-          // ═══════════════════════════════
-          // 👥 GROUPES
-          // ═══════════════════════════════
+          // ═════════════════════════════
+          // 👥 COMMANDES GROUPES
+          // ═════════════════════════════
 
           const groupCommands = [
             "add",
@@ -1147,11 +1468,16 @@ async function startBot() {
               command
             )
           ) {
+
             if (!isGroup) {
-              await sock.sendMessage(jid, {
-                text:
-                  "❌ Cette commande fonctionne uniquement dans un groupe.\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "❌ Cette commande fonctionne uniquement dans un groupe.\n🍫🎻"
+                }
+              );
 
               return;
             }
@@ -1171,21 +1497,25 @@ async function startBot() {
             if (
               command === "groupinfo"
             ) {
+
               const metadata =
                 await sock.groupMetadata(
                   jid
                 );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `👥 *GROUP INFO*\n\n` +
-                  `📛 Nom : ${metadata.subject}\n` +
-                  `👤 Membres : ${metadata.participants.length}\n` +
-                  `📝 Description : ${
-                    metadata.desc ||
-                    "Aucune"
-                  }\n\n🍫🎻`
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `👥 *GROUP INFO*\n\n` +
+                    `📛 Nom : ${metadata.subject}\n` +
+                    `👤 Membres : ${metadata.participants.length}\n` +
+                    `📝 Description : ${
+                      metadata.desc ||
+                      "Aucune"
+                    }\n\n🍫🎻`
+                }
+              );
 
               return;
             }
@@ -1195,24 +1525,28 @@ async function startBot() {
               command === "staff" ||
               command === "listadmin"
             ) {
+
               const admins =
                 await getGroupAdmins(
                   sock,
                   jid
                 );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `👑 *STAFF*\n\n` +
-                  admins
-                    .map(
-                      (id, i) =>
-                        `${i + 1}. @${jidToNumber(id)}`
-                    )
-                    .join("\n") +
-                  "\n\n🍫🎻",
-                mentions: admins
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `👑 *STAFF*\n\n` +
+                    admins
+                      .map(
+                        (id, i) =>
+                          `${i + 1}. @${jidToNumber(id)}`
+                      )
+                      .join("\n") +
+                    "\n\n🍫🎻",
+                  mentions: admins
+                }
+              );
 
               return;
             }
@@ -1222,6 +1556,7 @@ async function startBot() {
               command === "tagall" ||
               command === "tag"
             ) {
+
               const metadata =
                 await sock.groupMetadata(
                   jid
@@ -1232,32 +1567,38 @@ async function startBot() {
                   p => p.id
                 );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `📢 *TAG ALL*\n\n` +
-                  members
-                    .map(
-                      id =>
-                        `@${jidToNumber(id)}`
-                    )
-                    .join(" ") +
-                  "\n\n🍫🎻",
-                mentions: members
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `📢 *TAG ALL*\n\n` +
+                    members
+                      .map(
+                        id =>
+                          `@${jidToNumber(id)}`
+                      )
+                      .join(" ") +
+                    "\n\n🍫🎻",
+                  mentions: members
+                }
+              );
 
               return;
             }
 
             if (!admin) {
-              await sock.sendMessage(jid, {
-                text:
-                  "❌ Cette commande nécessite les droits administrateur.\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "❌ Cette commande nécessite les droits administrateur.\n🍫🎻"
+                }
+              );
 
               return;
             }
 
-            // TARGET
             const target =
               getTargetJid(
                 message,
@@ -1269,11 +1610,16 @@ async function startBot() {
               command === "kick" ||
               command === "ban"
             ) {
+
               if (!target) {
-                await sock.sendMessage(jid, {
-                  text:
-                    `❌ Mentionne quelqu'un.\nExemple : ${PREFIX}${command} @user\n🍫🎻`
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      `❌ Mentionne quelqu'un.\nExemple : ${PREFIX}${command} @user\n🍫🎻`
+                  }
+                );
 
                 return;
               }
@@ -1284,15 +1630,18 @@ async function startBot() {
                 "remove"
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `🚫 @${jidToNumber(
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `🚫 @${jidToNumber(
+                      target
+                    )} a été retiré.\n🍫🎻`,
+                  mentions: [
                     target
-                  )} a été retiré.\n🍫🎻`,
-                mentions: [
-                  target
-                ]
-              });
+                  ]
+                }
+              );
 
               return;
             }
@@ -1301,6 +1650,7 @@ async function startBot() {
             if (
               command === "add"
             ) {
+
               const number =
                 args[0]?.replace(
                   /\D/g,
@@ -1308,10 +1658,14 @@ async function startBot() {
                 );
 
               if (!number) {
-                await sock.sendMessage(jid, {
-                  text:
-                    "❌ Exemple : .add 242XXXXXXXXX\n🍫🎻"
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      "❌ Exemple : .add 242XXXXXXXXX\n🍫🎻"
+                  }
+                );
 
                 return;
               }
@@ -1325,13 +1679,16 @@ async function startBot() {
                 "add"
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `✅ @${number} ajouté.\n🍫🎻`,
-                mentions: [
-                  targetJid
-                ]
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `✅ @${number} ajouté.\n🍫🎻`,
+                  mentions: [
+                    targetJid
+                  ]
+                }
+              );
 
               return;
             }
@@ -1340,11 +1697,16 @@ async function startBot() {
             if (
               command === "promote"
             ) {
+
               if (!target) {
-                await sock.sendMessage(jid, {
-                  text:
-                    "❌ Mentionne la personne.\n🍫🎻"
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      "❌ Mentionne la personne.\n🍫🎻"
+                  }
+                );
 
                 return;
               }
@@ -1355,15 +1717,18 @@ async function startBot() {
                 "promote"
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `👑 @${jidToNumber(
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `👑 @${jidToNumber(
+                      target
+                    )} est maintenant admin.\n🍫🎻`,
+                  mentions: [
                     target
-                  )} est maintenant admin.\n🍫🎻`,
-                mentions: [
-                  target
-                ]
-              });
+                  ]
+                }
+              );
 
               return;
             }
@@ -1372,11 +1737,16 @@ async function startBot() {
             if (
               command === "demote"
             ) {
+
               if (!target) {
-                await sock.sendMessage(jid, {
-                  text:
-                    "❌ Mentionne la personne.\n🍫🎻"
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      "❌ Mentionne la personne.\n🍫🎻"
+                  }
+                );
 
                 return;
               }
@@ -1387,15 +1757,18 @@ async function startBot() {
                 "demote"
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `⬇️ @${jidToNumber(
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `⬇️ @${jidToNumber(
+                      target
+                    )} n'est plus admin.\n🍫🎻`,
+                  mentions: [
                     target
-                  )} n'est plus admin.\n🍫🎻`,
-                mentions: [
-                  target
-                ]
-              });
+                  ]
+                }
+              );
 
               return;
             }
@@ -1404,15 +1777,19 @@ async function startBot() {
             if (
               command === "link"
             ) {
+
               const code =
                 await sock.groupInviteCode(
                   jid
                 );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `🔗 *LIEN DU GROUPE*\n\nhttps://chat.whatsapp.com/${code}\n\n🍫🎻`
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `🔗 *LIEN DU GROUPE*\n\nhttps://chat.whatsapp.com/${code}\n\n🍫🎻`
+                }
+              );
 
               return;
             }
@@ -1421,14 +1798,18 @@ async function startBot() {
             if (
               command === "revoke"
             ) {
+
               await sock.groupRevokeInvite(
                 jid
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  "🔐 Ancien lien révoqué.\n🍫🎻"
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "🔐 Ancien lien révoqué.\n🍫🎻"
+                }
+              );
 
               return;
             }
@@ -1437,14 +1818,19 @@ async function startBot() {
             if (
               command === "groupname"
             ) {
+
               const name =
                 args.join(" ").trim();
 
               if (!name) {
-                await sock.sendMessage(jid, {
-                  text:
-                    "❌ Exemple : .groupname Nicolas Squad\n🍫🎻"
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      "❌ Exemple : .groupname Nicolas Squad\n🍫🎻"
+                  }
+                );
 
                 return;
               }
@@ -1454,10 +1840,13 @@ async function startBot() {
                 name
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  `✅ Nom changé en *${name}*\n🍫🎻`
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    `✅ Nom changé en *${name}*\n🍫🎻`
+                }
+              );
 
               return;
             }
@@ -1466,14 +1855,19 @@ async function startBot() {
             if (
               command === "setgdesc"
             ) {
+
               const desc =
                 args.join(" ").trim();
 
               if (!desc) {
-                await sock.sendMessage(jid, {
-                  text:
-                    "❌ Exemple : .setgdesc Bienvenue\n🍫🎻"
-                });
+
+                await sock.sendMessage(
+                  jid,
+                  {
+                    text:
+                      "❌ Exemple : .setgdesc Bienvenue\n🍫🎻"
+                  }
+                );
 
                 return;
               }
@@ -1483,10 +1877,13 @@ async function startBot() {
                 desc
               );
 
-              await sock.sendMessage(jid, {
-                text:
-                  "✅ Description modifiée.\n🍫🎻"
-              });
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "✅ Description modifiée.\n🍫🎻"
+                }
+              );
 
               return;
             }
@@ -1495,10 +1892,14 @@ async function startBot() {
             if (
               command === "left"
             ) {
-              await sock.sendMessage(jid, {
-                text:
-                  "👋 Nicolas Ultra XMD quitte le groupe.\n🍫🎻"
-              });
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "👋 Nicolas Ultra XMD quitte le groupe.\n🍫🎻"
+                }
+              );
 
               await sleep(1000);
 
@@ -1510,17 +1911,21 @@ async function startBot() {
             }
           }
 
-          // ═══════════════════════════════
-          // ❓ INCONNU
-          // ═══════════════════════════════
+          // ═════════════════════════════
+          // ❓ COMMANDE INCONNUE
+          // ═════════════════════════════
 
-          await sock.sendMessage(jid, {
-            text:
-              `❓ Commande inconnue : *${PREFIX}${command}*\n\n` +
-              `Utilise *${PREFIX}menu*.\n🍫🎻`
-          });
+          await sock.sendMessage(
+            jid,
+            {
+              text:
+                `❓ Commande inconnue : *${PREFIX}${command}*\n\n` +
+                `Utilise *${PREFIX}menu*.\n🍫🎻`
+            }
+          );
 
         } catch (error) {
+
           console.error(
             "❌ ERREUR MESSAGE :",
             error
@@ -1530,6 +1935,7 @@ async function startBot() {
     );
 
   } catch (error) {
+
     console.error(
       "❌ ERREUR DÉMARRAGE :",
       error
@@ -1538,12 +1944,20 @@ async function startBot() {
     starting = false;
 
     if (!reconnectTimer) {
+
       reconnectTimer =
-        setTimeout(() => {
-          reconnectTimer = null;
-          pairingRequested = false;
-          startBot();
-        }, 5000);
+        setTimeout(
+          () => {
+
+            reconnectTimer = null;
+
+            pairingRequested = false;
+
+            startBot();
+
+          },
+          5000
+        );
     }
   }
 }
@@ -1555,6 +1969,7 @@ async function startBot() {
 process.on(
   "uncaughtException",
   error => {
+
     console.error(
       "❌ UNCAUGHT EXCEPTION :",
       error
@@ -1565,6 +1980,7 @@ process.on(
 process.on(
   "unhandledRejection",
   error => {
+
     console.error(
       "❌ UNHANDLED REJECTION :",
       error
