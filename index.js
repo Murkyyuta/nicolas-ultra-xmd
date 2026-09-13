@@ -8,7 +8,6 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const pino = require("pino");
-const qrcode = require("qrcode-terminal");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
@@ -100,8 +99,7 @@ const FONTS = {
       )
     ),
 
-  italic: text =>
-    text,
+  italic: text => text,
 
   double: text =>
     text.replace(/[A-Za-z]/g, c =>
@@ -123,7 +121,6 @@ function randomFont(text) {
 // ======================================================
 
 const THEMES = {
-
   solo: {
     emoji: "🖤",
     symbol: "𓆩",
@@ -218,14 +215,9 @@ ${commands.map(cmd => `┃ ✦ ${PREFIX}${cmd}`).join("\n")}
 }
 
 function createMenu(themeName = "solo") {
+  const theme = THEMES[themeName] || THEMES.solo;
 
-  const theme =
-    THEMES[themeName] ||
-    THEMES.solo;
-
-  let menu = "";
-
-  menu += `
+  let menu = `
 ╭━━━┈┈┈┈┈┈┈┈┈┈━━━╮
        ${theme.symbol} ${randomFont(theme.title)} ${theme.emoji}
        ${randomFont(theme.subtitle)}
@@ -262,7 +254,7 @@ function createMenu(themeName = "solo") {
 }
 
 // ======================================================
-// 💎 RÉACTIONS DU MENU
+// 💎 RÉACTIONS MENU
 // ======================================================
 
 const MENU_REACTIONS = [
@@ -276,11 +268,8 @@ const MENU_REACTIONS = [
 ];
 
 async function reactMenu(sock, jid, messageKey) {
-
   for (const emoji of MENU_REACTIONS) {
-
     try {
-
       await sock.sendMessage(jid, {
         react: {
           text: emoji,
@@ -292,22 +281,20 @@ async function reactMenu(sock, jid, messageKey) {
         setTimeout(resolve, 350)
       );
 
-    } catch (e) {
-      console.log("Reaction error:", e.message);
+    } catch (error) {
+      console.log("Reaction error:", error.message);
     }
   }
 
   try {
-
     await sock.sendMessage(jid, {
       react: {
         text: "💎",
         key: messageKey
       }
     });
-
-  } catch (e) {
-    console.log("Final reaction error:", e.message);
+  } catch (error) {
+    console.log("Final reaction error:", error.message);
   }
 }
 
@@ -316,9 +303,7 @@ async function reactMenu(sock, jid, messageKey) {
 // ======================================================
 
 async function sendOwner(sock, jid) {
-
   return sock.sendMessage(jid, {
-
     text: `
 ╭━━━〔 👑 𝐎𝐖𝐍𝐄𝐑 〕━━━╮
 ┃
@@ -333,11 +318,10 @@ async function sendOwner(sock, jid) {
     𝐒𝐇𝐀𝐃𝐎𝐖 𝐌𝐎𝐍𝐀𝐑𝐂𝐇
 `
   });
-
 }
 
 // ======================================================
-// 👥 GROUP HELPERS
+// 👥 GROUP
 // ======================================================
 
 async function getGroupMetadata(sock, jid) {
@@ -345,7 +329,6 @@ async function getGroupMetadata(sock, jid) {
 }
 
 function isAdmin(participant, metadata) {
-
   const user = metadata.participants.find(
     p => p.id === participant
   );
@@ -358,9 +341,7 @@ function isAdmin(participant, metadata) {
 }
 
 async function requireAdmin(sock, jid, sender) {
-
   if (!jid.endsWith("@g.us")) {
-
     await sock.sendMessage(jid, {
       text: "❌ Cette commande fonctionne uniquement dans un groupe."
     });
@@ -368,10 +349,10 @@ async function requireAdmin(sock, jid, sender) {
     return false;
   }
 
-  const metadata = await getGroupMetadata(sock, jid);
+  const metadata =
+    await getGroupMetadata(sock, jid);
 
   if (!isAdmin(sender, metadata)) {
-
     await sock.sendMessage(jid, {
       text: "🚫 Seuls les admins peuvent utiliser cette commande."
     });
@@ -383,25 +364,15 @@ async function requireAdmin(sock, jid, sender) {
 }
 
 function extractTarget(message) {
+  const context =
+    message.message?.extendedTextMessage?.contextInfo;
 
-  if (
-    message.message?.extendedTextMessage?.contextInfo
-      ?.mentionedJid?.length
-  ) {
-
-    return message.message.extendedTextMessage
-      .contextInfo.mentionedJid[0];
-
+  if (context?.mentionedJid?.length) {
+    return context.mentionedJid[0];
   }
 
-  if (
-    message.message?.extendedTextMessage?.contextInfo
-      ?.participant
-  ) {
-
-    return message.message.extendedTextMessage
-      .contextInfo.participant;
-
+  if (context?.participant) {
+    return context.participant;
   }
 
   return null;
@@ -412,7 +383,6 @@ function extractTarget(message) {
 // ======================================================
 
 async function banUser(sock, jid, sender, message) {
-
   if (!await requireAdmin(sock, jid, sender)) {
     return;
   }
@@ -420,15 +390,12 @@ async function banUser(sock, jid, sender, message) {
   const target = extractTarget(message);
 
   if (!target) {
-
     return sock.sendMessage(jid, {
       text: `❌ Mentionne quelqu'un ou réponds à son message.\n\nExemple : ${PREFIX}ban @user`
     });
-
   }
 
   try {
-
     await sock.groupParticipantsUpdate(
       jid,
       [target],
@@ -447,13 +414,11 @@ async function banUser(sock, jid, sender, message) {
     });
 
   } catch (error) {
-
     console.log("BAN ERROR:", error);
 
     await sock.sendMessage(jid, {
       text: "❌ Impossible de bannir cet utilisateur. Vérifie que le bot est admin."
     });
-
   }
 }
 
@@ -462,7 +427,6 @@ async function banUser(sock, jid, sender, message) {
 // ======================================================
 
 async function unbanUser(sock, jid, sender, message) {
-
   if (!await requireAdmin(sock, jid, sender)) {
     return;
   }
@@ -470,14 +434,12 @@ async function unbanUser(sock, jid, sender, message) {
   const target = extractTarget(message);
 
   if (!target) {
-
     return sock.sendMessage(jid, {
-      text: `❌ Mentionne l'utilisateur à débannir ou réponds à son message.`
+      text: "❌ Mentionne l'utilisateur à débannir ou réponds à son message."
     });
-
   }
 
-  await sock.sendMessage(jid, {
+  return sock.sendMessage(jid, {
     text: `
 ╭━━〔 🔓 UNBAN 〕━━╮
 ┃
@@ -507,43 +469,39 @@ const facts = [
 ];
 
 async function handleFun(sock, jid, command) {
-
   if (command === ".blague" || command === ".joke") {
-
     return sock.sendMessage(jid, {
-      text: jokes[Math.floor(Math.random() * jokes.length)]
+      text: jokes[
+        Math.floor(Math.random() * jokes.length)
+      ]
     });
-
   }
 
   if (command === ".fact") {
-
     return sock.sendMessage(jid, {
-      text: facts[Math.floor(Math.random() * facts.length)]
+      text: facts[
+        Math.floor(Math.random() * facts.length)
+      ]
     });
-
   }
 
   if (command === ".coinflip") {
-
     return sock.sendMessage(jid, {
       text: Math.random() > 0.5
         ? "🪙 PILE !"
         : "🪙 FACE !"
     });
-
   }
 
   if (command === ".roll") {
-
     return sock.sendMessage(jid, {
-      text: `🎲 Tu as obtenu : ${Math.floor(Math.random() * 6) + 1}`
+      text: `🎲 Tu as obtenu : ${
+        Math.floor(Math.random() * 6) + 1
+      }`
     });
-
   }
 
   if (command === ".8ball") {
-
     const answers = [
       "Oui.",
       "Non.",
@@ -554,9 +512,13 @@ async function handleFun(sock, jid, command) {
     ];
 
     return sock.sendMessage(jid, {
-      text: `🎱 ${answers[Math.floor(Math.random() * answers.length)]}`
+      text:
+        `🎱 ${
+          answers[
+            Math.floor(Math.random() * answers.length)
+          ]
+        }`
     });
-
   }
 }
 
@@ -565,9 +527,7 @@ async function handleFun(sock, jid, command) {
 // ======================================================
 
 async function sendWaifu(sock, jid) {
-
   try {
-
     const response =
       await axios.get(
         "https://api.waifu.pics/sfw/waifu"
@@ -577,7 +537,6 @@ async function sendWaifu(sock, jid) {
       response.data.url;
 
     return sock.sendMessage(jid, {
-
       image: {
         url: imageUrl
       },
@@ -594,26 +553,22 @@ async function sendWaifu(sock, jid) {
     });
 
   } catch (error) {
-
     console.log("WAIFU ERROR:", error);
 
     return sock.sendMessage(jid, {
       text: "😭 La waifu est partie se cacher..."
     });
-
   }
 }
 
 // ======================================================
-// 🖤 ALIVE / PING / SPEED
+// ⚙️ GENERAL
 // ======================================================
 
 async function handleGeneral(sock, jid, command) {
-
   switch (command) {
 
     case ".alive":
-
       return sock.sendMessage(jid, {
         text: `
 🖤 𝐍𝐈𝐂𝐎𝐋𝐀𝐒 𝐔𝐋𝐓𝐑𝐀 𝐗𝐌𝐃
@@ -627,46 +582,39 @@ async function handleGeneral(sock, jid, command) {
       });
 
     case ".ping":
-
       return sock.sendMessage(jid, {
         text: "🏓 Pong ! Nicolas Ultra XMD est vivant 🖤"
       });
 
     case ".speed":
-
       return sock.sendMessage(jid, {
         text: `⚡ Speed : ${Date.now()} ms`
       });
 
     case ".prefix":
-
       return sock.sendMessage(jid, {
         text: `⚙️ Prefix actuel : ${PREFIX}`
       });
 
     case ".repo":
-
       return sock.sendMessage(jid, {
         text: "🖤 Nicolas Ultra XMD — Shadow Monarch Edition"
       });
 
     case ".owner":
-
       return sendOwner(sock, jid);
-
   }
 }
 
 // ======================================================
-// 🎨 THÈMES
+// 🎨 THEMES
 // ======================================================
 
 async function handleTheme(sock, jid, args) {
-
-  const requested = args[0]?.toLowerCase();
+  const requested =
+    args[0]?.toLowerCase();
 
   if (!requested) {
-
     return sock.sendMessage(jid, {
       text: `
 🎨 𝐓𝐇𝐄𝐌𝐄𝐒
@@ -685,29 +633,26 @@ async function handleTheme(sock, jid, args) {
 🎲 .theme random
 `
     });
-
   }
 
   if (requested === "random") {
-
     const names =
       Object.keys(THEMES);
 
     const random =
-      names[Math.floor(Math.random() * names.length)];
+      names[
+        Math.floor(Math.random() * names.length)
+      ];
 
     return sock.sendMessage(jid, {
       text: createMenu(random)
     });
-
   }
 
   if (!THEMES[requested]) {
-
     return sock.sendMessage(jid, {
       text: "❌ Thème inconnu."
     });
-
   }
 
   return sock.sendMessage(jid, {
@@ -740,31 +685,26 @@ async function sendOfficialMenu(sock, jid) {
     );
 
   if (!fs.existsSync(audioPath)) {
-
     return sock.sendMessage(jid, {
       text: `
-⚠️ Le menu officiel est envoyé.
+⚠️ Menu officiel envoyé.
 
-🎵 Pour la musique, ajoute :
+🎵 Ajoute ton fichier audio :
 media/sem-demora.mp3
 
-dans ton projet GitHub.
+pour activer la musique.
 `
     });
-
   }
 
   return sock.sendMessage(jid, {
-
     audio: {
       url: audioPath
     },
 
     mimetype: "audio/mpeg",
     ptt: false
-
   });
-
 }
 
 // ======================================================
@@ -772,7 +712,6 @@ dans ton projet GitHub.
 // ======================================================
 
 async function handleKiki(sock, jid) {
-
   return sock.sendMessage(jid, {
     text: `
 ╭━━〔 🧰 KIKI 〕━━╮
@@ -783,11 +722,10 @@ async function handleKiki(sock, jid) {
 ╰━━━━━━━━━━━━━━╯
 `
   });
-
 }
 
 // ======================================================
-// 📱 ROUTEUR
+// 📱 MESSAGE ROUTER
 // ======================================================
 
 async function handleMessage(sock, msg) {
@@ -823,9 +761,9 @@ async function handleMessage(sock, msg) {
       msg.key.participant ||
       msg.key.remoteJid;
 
-    // ==================================================
+    // ================================================
     // 📖 MENU
-    // ==================================================
+    // ================================================
 
     if (command === ".menu") {
 
@@ -833,12 +771,10 @@ async function handleMessage(sock, msg) {
         args[0]?.toLowerCase() ===
         "officiel"
       ) {
-
         return sendOfficialMenu(
           sock,
           jid
         );
-
       }
 
       const sentMenu =
@@ -855,79 +791,69 @@ async function handleMessage(sock, msg) {
       return;
     }
 
-    // ==================================================
+    // ================================================
     // 🎨 THEME
-    // ==================================================
+    // ================================================
 
     if (command === ".theme") {
-
       return handleTheme(
         sock,
         jid,
         args
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🔨 BAN
-    // ==================================================
+    // ================================================
 
     if (command === ".ban") {
-
       return banUser(
         sock,
         jid,
         sender,
         msg
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🔓 UNBAN
-    // ==================================================
+    // ================================================
 
     if (command === ".unban") {
-
       return unbanUser(
         sock,
         jid,
         sender,
         msg
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🖤 WAIFU
-    // ==================================================
+    // ================================================
 
     if (command === ".waifu") {
-
       return sendWaifu(
         sock,
         jid
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🧰 KIKI
-    // ==================================================
+    // ================================================
 
     if (command === ".kiki") {
-
       return handleKiki(
         sock,
         jid
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // ⚙️ GENERAL
-    // ==================================================
+    // ================================================
 
     if (
       [
@@ -939,18 +865,16 @@ async function handleMessage(sock, msg) {
         ".owner"
       ].includes(command)
     ) {
-
       return handleGeneral(
         sock,
         jid,
         command
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🎭 FUN
-    // ==================================================
+    // ================================================
 
     if (
       [
@@ -962,48 +886,41 @@ async function handleMessage(sock, msg) {
         ".8ball"
       ].includes(command)
     ) {
-
       return handleFun(
         sock,
         jid,
         command
       );
-
     }
 
-    // ==================================================
+    // ================================================
     // 🧩 TGS
-    // ==================================================
+    // ================================================
 
     if (command === ".tgs") {
-
       return sock.sendMessage(jid, {
         text: `
 🧩 𝐓𝐆𝐒 𝐌𝐎𝐃𝐄
 
-Envoie/réponds à un sticker Telegram
-.TGS pour lancer le système de conversion.
+Le système TGS est prévu pour
+Telegram → WhatsApp.
 
-⚠️ Le moteur TGS → WebP doit être installé
-sur le serveur avant l'envoi WhatsApp.
+⚠️ Le moteur de conversion TGS → WebP
+doit encore être installé sur Railway.
 `
       });
-
     }
 
   } catch (error) {
-
     console.error(
       "MESSAGE ERROR:",
       error
     );
-
   }
-
 }
 
 // ======================================================
-// 🚀 DÉMARRAGE
+// 🚀 DÉMARRAGE + PAIRING CODE
 // ======================================================
 
 async function startBot() {
@@ -1037,32 +954,107 @@ async function startBot() {
         "Chrome",
         "1.0.0"
       ]
-
     });
+
+  // ================================================
+  // 💾 SAUVEGARDE SESSION
+  // ================================================
 
   sock.ev.on(
     "creds.update",
     saveCreds
   );
 
+  // ================================================
+  // 🔐 PAIRING CODE
+  // ================================================
+
+  if (!sock.authState.creds.registered) {
+
+    const phoneNumber =
+      process.env.PAIRING_NUMBER;
+
+    if (!phoneNumber) {
+
+      console.log(`
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃ ❌ PAIRING_NUMBER
+┃    MANQUANT
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+Ajoute cette variable dans Railway :
+
+PAIRING_NUMBER=242XXXXXXXXX
+
+⚠️ Format international
+⚠️ Sans +
+⚠️ Sans espaces
+⚠️ Sans tirets
+`);
+
+    } else {
+
+      const cleanNumber =
+        phoneNumber.replace(
+          /[^0-9]/g,
+          ""
+        );
+
+      setTimeout(
+        async () => {
+
+          try {
+
+            const code =
+              await sock.requestPairingCode(
+                cleanNumber
+              );
+
+            console.log(`
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃
+┃ 🔐 NICOLAS ULTRA XMD
+┃
+┃ ⚔️ SHADOW MONARCH
+┃
+┃ 🔑 PAIRING CODE :
+┃
+┃     ${code}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📱 WhatsApp :
+Paramètres
+→ Appareils connectés
+→ Connecter un appareil
+→ Connecter avec un numéro
+`);
+
+          } catch (error) {
+
+            console.error(
+              "❌ PAIRING CODE ERROR:",
+              error
+            );
+
+          }
+
+        },
+        3000
+      );
+    }
+  }
+
+  // ================================================
+  // 🔌 CONNEXION
+  // ================================================
+
   sock.ev.on(
     "connection.update",
-    ({ connection, lastDisconnect, qr }) => {
-
-      if (qr) {
-
-        console.log(
-          "\n📱 SCAN LE QR CODE :\n"
-        );
-
-        qrcode.generate(
-          qr,
-          {
-            small: true
-          }
-        );
-
-      }
+    async ({
+      connection,
+      lastDisconnect
+    }) => {
 
       if (connection === "open") {
 
@@ -1077,9 +1069,7 @@ async function startBot() {
 
       }
 
-      if (
-        connection === "close"
-      ) {
+      if (connection === "close") {
 
         const shouldReconnect =
           lastDisconnect
@@ -1100,12 +1090,20 @@ async function startBot() {
 
           startBot();
 
+        } else {
+
+          console.log(
+            "⚠️ Session déconnectée. Re-pairing nécessaire."
+          );
+
         }
-
       }
-
     }
   );
+
+  // ================================================
+  // 💬 MESSAGES
+  // ================================================
 
   sock.ev.on(
     "messages.upsert",
@@ -1123,7 +1121,10 @@ async function startBot() {
 
     }
   );
-
 }
+
+// ======================================================
+// 🚀 START
+// ======================================================
 
 startBot();
