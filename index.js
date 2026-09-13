@@ -4,176 +4,44 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } = require("@whiskeysockets/baileys");
 
 const pino = require("pino");
-const axios = require("axios");
 const fs = require("fs");
+const path = require("path");
 
-// ======================================================
-// NICOLAS ULTRA XMD
-// SHADOW MONARCH ⚔️
-// ======================================================
+// ═══════════════════════════════════════
+// 🔥 NICOLAS ULTRA XMD
+// ═══════════════════════════════════════
 
+const BOT_NAME = "NICOLAS ULTRA XMD";
+const VERSION = "1.0.0";
 const PREFIX = ".";
+
+const AUTH_DIR = "/app/auth_info_baileys";
 
 const OWNER_NAME = "Nicolas";
 const OWNER_NUMBER = "242067904938";
 const OWNER_TELEGRAM = "@Sage_ou_Nicolas";
-const OWNER_TELEGRAM_LINK = "https://t.me/Sage_ou_Nicolas";
 
-const BOT_NAME = "NICOLAS ULTRA XMD";
-const BOT_VERSION = "1.0.0";
+const THEMES = [
+  "solo",
+  "naruto",
+  "onepiece",
+  "bleach",
+  "demon",
+  "dragonball",
+  "jujutsu",
+  "aot",
+  "hxh",
+  "blackclover"
+];
 
-const AUTH_DIR = "/app/auth_info_baileys";
-
-// ======================================================
-// DOSSIERS
-// ======================================================
-
-if (!fs.existsSync("/app")) {
-  fs.mkdirSync("/app", { recursive: true });
-}
-
-if (!fs.existsSync(AUTH_DIR)) {
-  fs.mkdirSync(AUTH_DIR, { recursive: true });
-}
-
-// ======================================================
-// THEMES
-// ======================================================
-
-const themes = {
-  solo: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "SHADOW MONARCH",
-    footer: "ARISE 🖤⚔️"
-  },
-
-  naruto: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "NINJA WORLD 🍥",
-    footer: "DATTEBAYO 🧡"
-  },
-
-  onepiece: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "GRAND LINE ☠️",
-    footer: "I'M GONNA BE KING OF THE PIRATES 🏴‍☠️"
-  },
-
-  bleach: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "SOUL SOCIETY ⚔️",
-    footer: "BANKAI 🖤"
-  },
-
-  demon: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "DEMON SLAYER 🔥",
-    footer: "SET YOUR HEART ABLAZE 🔥"
-  },
-
-  dragonball: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "DRAGON BALL 🐉",
-    footer: "KAMEHAMEHA 💥"
-  },
-
-  jujutsu: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "JUJUTSU KAISEN 👁️",
-    footer: "DOMAIN EXPANSION 🌀"
-  },
-
-  aot: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "ATTACK ON TITAN ⚔️",
-    footer: "SHINZOU WO SASAGEYO 🪽"
-  },
-
-  hxh: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "HUNTER × HUNTER 🎴",
-    footer: "NEN MASTER 👁️"
-  },
-
-  blackclover: {
-    title: "NICOLAS ULTRA XMD",
-    subtitle: "BLACK CLOVER ♣️",
-    footer: "NO MAGIC, NO PROBLEM ⚔️"
-  }
-};
-
-let currentTheme = "solo";
-
-// ======================================================
-// COMMANDES
-// ======================================================
-
-const commands = {
-
-  GROUP: [
-    ".add", ".ban", ".unban", ".antibadword", ".antibot",
-    ".antilink", ".antispam", ".antitag", ".antipromote",
-    ".antidemote", ".goodbye", ".del", ".ppgroup",
-    ".groupinfo", ".groupname", ".kick", ".kickall",
-    ".left", ".link", ".listadmin", ".mute", ".promote",
-    ".demote", ".purge", ".resetlink", ".revoke",
-    ".setgdesc", ".staff", ".tag", ".tagall", ".unmute",
-    ".welcome", ".setwelcome"
-  ],
-
-  FUN: [
-    ".8ball", ".blague", ".character", ".coinflip",
-    ".compliment", ".dare", ".fact", ".flirt", ".gif",
-    ".goodnight", ".hug", ".joke", ".kiss", ".love",
-    ".meme", ".news", ".quote", ".roll", ".roseday",
-    ".ship", ".slap", ".stupid", ".trivia", ".truth",
-    ".valentine", ".waifu"
-  ],
-
-  MEDIA: [
-    ".instagram", ".video", ".apk", ".capcut", ".facebook",
-    ".getstatus", ".img", ".mediafire", ".movie",
-    ".pinterest", ".wallpapers"
-  ],
-
-  GENERAL: [
-    ".alive", ".antidelete", ".channelid", ".fancy",
-    ".gpstatus", ".menu", ".owner", ".ping", ".repo",
-    ".voice"
-  ],
-
-  AI: [
-    ".tts", ".ai", ".caricature", ".chatbot", ".imagine",
-    ".manga", ".pixelart", ".gsticker", ".traduc"
-  ],
-
-  TOOLS: [
-    ".attp", ".photo", ".sticker", ".tgs", ".take",
-    ".textmaker", ".url", ".kiki"
-  ],
-
-  GAMES: [
-    ".fast", ".guess", ".higherlower", ".math",
-    ".memory", ".rps", ".word"
-  ],
-
-  DOWNLOAD: [
-    ".lyrics", ".play", ".song", ".tiktok"
-  ],
-
-  SYSTEM: [
-    ".allprefix", ".botimage", ".botname", ".delprefix",
-    ".online", ".prefix", ".speed"
-  ]
-};
-
-// ======================================================
-// UTILITAIRES
-// ======================================================
+// ═══════════════════════════════════════
+// 🧰 OUTILS
+// ═══════════════════════════════════════
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -184,931 +52,192 @@ function randomItem(array) {
 }
 
 function jidToNumber(jid = "") {
-  return jid.split("@")[0].replace(/\D/g, "");
+  return jid.split("@")[0].split(":")[0];
+}
+
+function isGroupJid(jid = "") {
+  return jid.endsWith("@g.us");
+}
+
+function escapeText(text = "") {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+async function react(sock, jid, message, emoji) {
+  try {
+    await sock.sendMessage(jid, {
+      react: {
+        text: emoji,
+        key: message.key
+      }
+    });
+  } catch {}
 }
 
 function getText(message) {
-  const msg = message.message || {};
+  const msg = message.message;
+  if (!msg) return "";
 
   return (
     msg.conversation ||
     msg.extendedTextMessage?.text ||
     msg.imageMessage?.caption ||
     msg.videoMessage?.caption ||
+    msg.documentMessage?.caption ||
     ""
-  ).trim();
+  );
 }
 
-function isGroupJid(jid) {
-  return jid && jid.endsWith("@g.us");
-}
+// ═══════════════════════════════════════
+// 👥 GROUPES
+// ═══════════════════════════════════════
 
-async function react(sock, jid, messageKey, emoji) {
+async function getGroupAdmins(sock, groupJid) {
   try {
-    await sock.sendMessage(jid, {
-      react: {
-        text: emoji,
-        key: messageKey
-      }
-    });
-  } catch {}
-}
+    const metadata = await sock.groupMetadata(groupJid);
 
-// ======================================================
-// MENU
-// ======================================================
-
-function buildMenu(themeName = currentTheme) {
-  const theme = themes[themeName] || themes.solo;
-
-  return `
-╭━━━━━━━━━━━━━━━━━━━━━━╮
-┃      ⚔️ ${theme.title}
-┃      👑 ${theme.subtitle}
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-
-┏━━━〔 🖤 GENERAL 〕━━━
-${commands.GENERAL.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 👥 GROUP 〕━━━
-${commands.GROUP.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 😂 FUN 〕━━━
-${commands.FUN.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 🖼️ MEDIA 〕━━━
-${commands.MEDIA.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 🤖 AI 〕━━━
-${commands.AI.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 🛠️ TOOLS 〕━━━
-${commands.TOOLS.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 🎮 GAMES 〕━━━
-${commands.GAMES.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 📥 DOWNLOAD 〕━━━
-${commands.DOWNLOAD.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 ⚙️ SYSTEM 〕━━━
-${commands.SYSTEM.join("\n")}
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-┏━━━〔 🎨 THEME 〕━━━
-.theme solo
-.theme naruto
-.theme onepiece
-.theme bleach
-.theme demon
-.theme dragonball
-.theme jujutsu
-.theme aot
-.theme hxh
-.theme blackclover
-.theme random
-┗━━━━━━━━━━━━━━━━━━━━━━
-
-${theme.footer}
-`.trim();
-}
-
-// ======================================================
-// ADMIN / GROUPE
-// ======================================================
-
-async function getGroupAdmins(sock, jid) {
-  const metadata = await sock.groupMetadata(jid);
-
-  return metadata.participants
-    .filter(p => p.admin === "admin" || p.admin === "superadmin")
-    .map(p => p.id);
-}
-
-async function isAdmin(sock, jid, userJid) {
-  if (!isGroupJid(jid)) return false;
-
-  try {
-    const admins = await getGroupAdmins(sock, jid);
-    return admins.includes(userJid);
+    return metadata.participants
+      .filter(p => p.admin === "admin" || p.admin === "superadmin")
+      .map(p => p.id);
   } catch {
-    return false;
+    return [];
   }
 }
 
-async function getTargetJid(message, args) {
+async function isAdmin(sock, groupJid, userJid) {
+  const admins = await getGroupAdmins(sock, groupJid);
+  return admins.includes(userJid);
+}
+
+function getTargetJid(message, args) {
   const mentioned =
     message.message?.extendedTextMessage?.contextInfo?.mentionedJid;
 
-  if (mentioned && mentioned.length > 0) {
+  if (mentioned?.length) {
     return mentioned[0];
   }
 
-  const quoted =
-    message.message?.extendedTextMessage?.contextInfo?.participant;
-
-  if (quoted) {
-    return quoted;
-  }
-
-  const number = args[0]?.replace(/\D/g, "");
-
-  if (number) {
-    return `${number}@s.whatsapp.net`;
+  if (args[0]?.startsWith("@")) {
+    return args[0].replace("@", "") + "@s.whatsapp.net";
   }
 
   return null;
 }
 
-// ======================================================
-// COMMAND HANDLER
-// ======================================================
-
-async function handleCommand(sock, message, command, args) {
-  const jid = message.key.remoteJid;
-  const sender = message.key.participant || message.key.remoteJid;
-
-  // MENU
-  if (command === "menu") {
-    const menu = buildMenu();
-
-    const sent = await sock.sendMessage(jid, {
-      text: menu
-    });
-
-    const reactions = [
-      "🎀",
-      "🪄",
-      "🍫",
-      "🎻",
-      "🍟",
-      "🍎",
-      "🧿"
-    ];
-
-    for (const emoji of reactions) {
-      await sleep(350);
-      await react(sock, jid, sent.key, emoji);
-    }
-
-    await sleep(350);
-    await react(sock, jid, sent.key, "💎");
-    return;
-  }
-
-  // ALIVE
-  if (command === "alive") {
-    await sock.sendMessage(jid, {
-      text:
-        "╭━━━━━━━━━━━━━━━━━━━━━━╮\n" +
-        "┃ 🖤 NICOLAS ULTRA XMD\n" +
-        "┃ ⚔️ SHADOW MONARCH\n" +
-        "┃\n" +
-        "┃ ✅ Bot en ligne\n" +
-        "┃ ⚡ Système opérationnel\n" +
-        "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-    });
-    return;
-  }
-
-  // PING
-  if (command === "ping") {
-    const start = Date.now();
-
-    await sock.sendMessage(jid, {
-      text: "🏓 Calcul de la vitesse..."
-    });
-
-    const ms = Date.now() - start;
-
-    await sock.sendMessage(jid, {
-      text: `🏓 Pong !\n⚡ ${ms} ms`
-    });
-    return;
-  }
-
-  // SPEED
-  if (command === "speed") {
-    await sock.sendMessage(jid, {
-      text: `⚡ Nicolas Ultra XMD\nVitesse : ${Date.now() % 1000} ms`
-    });
-    return;
-  }
-
-  // OWNER
-  if (command === "owner") {
-    await sock.sendMessage(jid, {
-      text:
-        "╭━━━━━━━━━━━━━━━━━━━━━━╮\n" +
-        "┃ 👑 OWNER\n" +
-        "╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n" +
-        `👤 ${OWNER_NAME}\n` +
-        `📱 WhatsApp : +${OWNER_NUMBER}\n` +
-        `✈️ Telegram : ${OWNER_TELEGRAM}\n` +
-        `🔗 ${OWNER_TELEGRAM_LINK}\n\n` +
-        "🖤 Nicolas Ultra XMD"
-    });
-    return;
-  }
-
-  // REPO
-  if (command === "repo") {
-    await sock.sendMessage(jid, {
-      text:
-        "🖤 NICOLAS ULTRA XMD\n\n" +
-        "⚔️ Shadow Monarch WhatsApp Bot\n" +
-        "🤖 AI • Group • Fun • Media • Games\n\n" +
-        "Version : " + BOT_VERSION
-    });
-    return;
-  }
-
-  // THEME
-  if (command === "theme") {
-    const requested = (args[0] || "").toLowerCase();
-
-    if (requested === "random") {
-      currentTheme = randomItem(Object.keys(themes));
-    } else if (themes[requested]) {
-      currentTheme = requested;
-    } else {
-      await sock.sendMessage(jid, {
-        text:
-          "🎨 Thèmes disponibles :\n\n" +
-          Object.keys(themes).join("\n")
-      });
-      return;
-    }
-
-    await sock.sendMessage(jid, {
-      text:
-        `🎨 Thème activé : ${currentTheme}\n\n` +
-        buildMenu(currentTheme)
-    });
-    return;
-  }
-
-  // KIKI
-  if (command === "kiki") {
-    await sock.sendMessage(jid, {
-      text:
-        "🛠️ KIKI\n\n" +
-        "Petit outil de Nicolas Ultra XMD 😈\n" +
-        "Le système est prêt."
-    });
-    return;
-  }
-
-  // WAIFU
-  if (command === "waifu") {
-    try {
-      const response = await axios.get(
-        "https://api.waifu.pics/sfw/waifu",
-        { timeout: 15000 }
-      );
-
-      if (response.data?.url) {
-        await sock.sendMessage(jid, {
-          image: {
-            url: response.data.url
-          },
-          caption: "🌸 Waifu du jour 🖤"
-        });
-      } else {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de récupérer une waifu."
-        });
-      }
-    } catch {
-      await sock.sendMessage(jid, {
-        text: "❌ Le service waifu est temporairement indisponible."
-      });
-    }
-    return;
-  }
-
-  // 8BALL
-  if (command === "8ball") {
-    const answers = [
-      "Oui 😎",
-      "Non ❌",
-      "Probablement 👀",
-      "Certainement 🔥",
-      "J'en doute fortement 💀",
-      "Demande encore plus tard 🌀",
-      "Les étoiles disent oui ✨",
-      "Impossible de savoir 🤔"
-    ];
-
-    await sock.sendMessage(jid, {
-      text: `🎱 ${randomItem(answers)}`
-    });
-    return;
-  }
-
-  // COINFLIP
-  if (command === "coinflip") {
-    await sock.sendMessage(jid, {
-      text:
-        `🪙 Résultat : ${
-          Math.random() < 0.5
-            ? "PILE 🪙"
-            : "FACE 🪙"
-        }`
-    });
-    return;
-  }
-
-  // ROLL
-  if (command === "roll") {
-    const max = Math.max(2, parseInt(args[0]) || 6);
-    const result = Math.floor(Math.random() * max) + 1;
-
-    await sock.sendMessage(jid, {
-      text: `🎲 ${result} / ${max}`
-    });
-    return;
-  }
-
-  // JOKE
-  if (command === "joke" || command === "blague") {
-    const jokes = [
-      "Pourquoi les développeurs aiment le dark mode ? Parce que la lumière attire les bugs. 💀",
-      "Mon code fonctionne parfaitement... jusqu'à ce que quelqu'un le regarde. 😭",
-      "J'ai demandé à mon PC de réfléchir. Il a redémarré. 💀"
-    ];
-
-    await sock.sendMessage(jid, {
-      text: `😂 ${randomItem(jokes)}`
-    });
-    return;
-  }
-
-  // COMPLIMENT
-  if (command === "compliment") {
-    await sock.sendMessage(jid, {
-      text: "😎 T'as une énergie de personnage principal aujourd'hui."
-    });
-    return;
-  }
-
-  // FLIRT
-  if (command === "flirt") {
-    const lines = [
-      "Si le charme était une commande, tu serais `.maxlevel` 😏",
-      "Tu viens de faire laguer mon système avec ton style. 😭❤️",
-      "Même Shadow Monarch aurait besoin de courage pour t'approcher. 😈"
-    ];
-
-    await sock.sendMessage(jid, {
-      text: randomItem(lines)
-    });
-    return;
-  }
-
-  // LOVE
-  if (command === "love") {
-    await sock.sendMessage(jid, {
-      text: "❤️ L'amour c'est compliqué... mais ça reste beau."
-    });
-    return;
-  }
-
-  // HUG
-  if (command === "hug") {
-    await sock.sendMessage(jid, {
-      text: "🫂 *Gros câlin virtuel*"
-    });
-    return;
-  }
-
-  // KISS
-  if (command === "kiss") {
-    await sock.sendMessage(jid, {
-      text: "😘 Bisou virtuel envoyé."
-    });
-    return;
-  }
-
-  // SLAP
-  if (command === "slap") {
-    await sock.sendMessage(jid, {
-      text: "👋💥 *PAF* Voilà, c'était gratuit."
-    });
-    return;
-  }
-
-  // FACT
-  if (command === "fact") {
-    const facts = [
-      "🧠 Le cerveau humain contient environ 86 milliards de neurones.",
-      "🌊 La majeure partie de la surface terrestre est couverte par les océans.",
-      "⚡ La lumière voyage beaucoup plus vite que le son."
-    ];
-
-    await sock.sendMessage(jid, {
-      text: randomItem(facts)
-    });
-    return;
-  }
-
-  // TRUTH
-  if (command === "truth") {
-    const truths = [
-      "Quelle est ta plus grande peur ? 👀",
-      "Qui est la dernière personne à laquelle tu as pensé ? 😏",
-      "Quel est ton plus gros secret ? 🤫",
-      "Quelle personne te manque actuellement ? ❤️"
-    ];
-
-    await sock.sendMessage(jid, {
-      text: `🎯 Vérité : ${randomItem(truths)}`
-    });
-    return;
-  }
-
-  // DARE
-  if (command === "dare") {
-    const dares = [
-      "Envoie un message drôle au dernier contact de ta liste 😂",
-      "Change ta photo de profil pendant 5 minutes 😭",
-      "Dis quelque chose de gentil à quelqu'un ❤️",
-      "Envoie simplement : ARISE ⚔️"
-    ];
-
-    await sock.sendMessage(jid, {
-      text: `🔥 Défi : ${randomItem(dares)}`
-    });
-    return;
-  }
-
-  // RPS
-  if (command === "rps") {
-    const choices = [
-      "pierre 🪨",
-      "papier 📄",
-      "ciseaux ✂️"
-    ];
-
-    await sock.sendMessage(jid, {
-      text:
-        `🎮 Nicolas Ultra XMD choisit : ${randomItem(choices)}`
-    });
-    return;
-  }
-
-  // MATH
-  if (command === "math") {
-    const a = Math.floor(Math.random() * 20) + 1;
-    const b = Math.floor(Math.random() * 20) + 1;
-
-    await sock.sendMessage(jid, {
-      text: `🧮 Combien font ${a} + ${b} ?`
-    });
-    return;
-  }
-
-  // ====================================================
-  // COMMANDES GROUPE
-  // ====================================================
-
-  if (
-    [
-      "add",
-      "ban",
-      "unban",
-      "kick",
-      "promote",
-      "demote",
-      "tag",
-      "tagall",
-      "del",
-      "mute",
-      "unmute",
-      "link",
-      "revoke",
-      "resetlink",
-      "listadmin",
-      "staff",
-      "groupinfo",
-      "groupname",
-      "setgdesc",
-      "welcome",
-      "setwelcome",
-      "goodbye"
-    ].includes(command)
-  ) {
-
-    if (!isGroupJid(jid)) {
-      await sock.sendMessage(jid, {
-        text: "❌ Cette commande fonctionne uniquement dans un groupe."
-      });
-      return;
-    }
-
-    const admin = await isAdmin(sock, jid, sender);
-
-    // ADD
-    if (command === "add") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const number = args[0]?.replace(/\D/g, "");
-
-      if (!number) {
-        await sock.sendMessage(jid, {
-          text: "Utilisation : .add 242XXXXXXXXX"
-        });
-        return;
-      }
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [`${number}@s.whatsapp.net`],
-          "add"
-        );
-
-        await sock.sendMessage(jid, {
-          text: `✅ ${number} ajouté au groupe.`
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible d'ajouter cette personne."
-        });
-      }
-
-      return;
-    }
-
-    // BAN / KICK
-    if (command === "ban" || command === "kick") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const target = await getTargetJid(message, args);
-
-      if (!target) {
-        await sock.sendMessage(jid, {
-          text: `Utilisation : .${command} @personne`
-        });
-        return;
-      }
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [target],
-          "remove"
-        );
-
-        await sock.sendMessage(jid, {
-          text:
-            `👢 ${
-              command === "ban"
-                ? "Membre expulsé."
-                : "Membre retiré."
-            }`
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de retirer cette personne."
-        });
-      }
-
-      return;
-    }
-
-    // UNBAN
-    if (command === "unban") {
-      await sock.sendMessage(jid, {
-        text:
-          "ℹ️ WhatsApp ne permet pas de réintégrer automatiquement " +
-          "une personne expulsée sans l'ajouter à nouveau."
-      });
-      return;
-    }
-
-    // PROMOTE
-    if (command === "promote") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const target = await getTargetJid(message, args);
-
-      if (!target) {
-        await sock.sendMessage(jid, {
-          text: "Utilisation : .promote @personne"
-        });
-        return;
-      }
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [target],
-          "promote"
-        );
-
-        await sock.sendMessage(jid, {
-          text: "👑 Admin ajouté."
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de promouvoir cette personne."
-        });
-      }
-
-      return;
-    }
-
-    // DEMOTE
-    if (command === "demote") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const target = await getTargetJid(message, args);
-
-      if (!target) {
-        await sock.sendMessage(jid, {
-          text: "Utilisation : .demote @personne"
-        });
-        return;
-      }
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [target],
-          "demote"
-        );
-
-        await sock.sendMessage(jid, {
-          text: "⬇️ Admin retiré."
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de retirer les droits."
-        });
-      }
-
-      return;
-    }
-
-    // TAG / TAGALL
-    if (command === "tag" || command === "tagall") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const metadata = await sock.groupMetadata(jid);
-
-      const mentions = metadata.participants.map(
-        participant => participant.id
-      );
-
-      const text =
-        args.length > 0
-          ? args.join(" ")
-          : "📢 Tous les membres sont convoqués !";
-
-      await sock.sendMessage(jid, {
-        text,
-        mentions
-      });
-
-      return;
-    }
-
-    // GROUP INFO
-    if (command === "groupinfo") {
-      const metadata = await sock.groupMetadata(jid);
-
-      await sock.sendMessage(jid, {
-        text:
-          "╭━━━━━━━━━━━━━━━━━━━━━━╮\n" +
-          "┃ 👥 GROUP INFO\n" +
-          "╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n" +
-          `📛 Nom : ${metadata.subject}\n` +
-          `👤 Membres : ${metadata.participants.length}\n` +
-          `🆔 ID : ${jid}`
-      });
-
-      return;
-    }
-
-    // LIST ADMIN
-    if (command === "listadmin" || command === "staff") {
-      const metadata = await sock.groupMetadata(jid);
-
-      const adminParticipants =
-        metadata.participants.filter(p => p.admin);
-
-      const admins = adminParticipants
-        .map(p => `• @${jidToNumber(p.id)}`)
-        .join("\n");
-
-      const mentions = adminParticipants.map(p => p.id);
-
-      await sock.sendMessage(jid, {
-        text:
-          `👑 ADMINS\n\n${
-            admins || "Aucun admin trouvé."
-          }`,
-        mentions
-      });
-
-      return;
-    }
-
-    // LINK
-    if (command === "link") {
-      try {
-        const code = await sock.groupInviteCode(jid);
-
-        await sock.sendMessage(jid, {
-          text:
-            `🔗 Lien du groupe :\nhttps://chat.whatsapp.com/${code}`
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de récupérer le lien."
-        });
-      }
-
-      return;
-    }
-
-    // REVOKE
-    if (command === "revoke" || command === "resetlink") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      try {
-        await sock.groupRevokeInvite(jid);
-
-        await sock.sendMessage(jid, {
-          text: "🔄 Nouveau lien du groupe généré."
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de réinitialiser le lien."
-        });
-      }
-
-      return;
-    }
-
-    // GROUP NAME
-    if (command === "groupname") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const name = args.join(" ");
-
-      if (!name) {
-        await sock.sendMessage(jid, {
-          text: "Utilisation : .groupname Nouveau nom"
-        });
-        return;
-      }
-
-      try {
-        await sock.groupUpdateSubject(jid, name);
-
-        await sock.sendMessage(jid, {
-          text: "✅ Nom du groupe modifié."
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de modifier le nom."
-        });
-      }
-
-      return;
-    }
-
-    // SET DESCRIPTION
-    if (command === "setgdesc") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      const description = args.join(" ");
-
-      if (!description) {
-        await sock.sendMessage(jid, {
-          text: "Utilisation : .setgdesc nouvelle description"
-        });
-        return;
-      }
-
-      try {
-        await sock.groupUpdateDescription(
-          jid,
-          description
-        );
-
-        await sock.sendMessage(jid, {
-          text: "✅ Description modifiée."
-        });
-      } catch {
-        await sock.sendMessage(jid, {
-          text: "❌ Impossible de modifier la description."
-        });
-      }
-
-      return;
-    }
-
-    // LEFT
-    if (command === "left") {
-      if (!admin) {
-        await sock.sendMessage(jid, {
-          text: "❌ Réservé aux admins."
-        });
-        return;
-      }
-
-      await sock.sendMessage(jid, {
-        text: "👋 Nicolas Ultra XMD quitte le groupe..."
-      });
-
-      await sock.groupLeave(jid);
-      return;
-    }
-  }
-
-  // UNKNOWN
-  await sock.sendMessage(jid, {
-    text:
-      `❌ Commande inconnue : ${PREFIX}${command}\n\n` +
-      `Tape ${PREFIX}menu pour voir les commandes.`
-  });
+// ═══════════════════════════════════════
+// 🎀 MENU
+// ═══════════════════════════════════════
+
+function menuText() {
+  return `
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃ 🔥 *${BOT_NAME}*
+┃ ⚔️ Version ${VERSION}
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+🎀 *GENERAL*
+${PREFIX}alive
+${PREFIX}ping
+${PREFIX}speed
+${PREFIX}owner
+${PREFIX}repo
+${PREFIX}menu
+
+👥 *GROUPES*
+${PREFIX}add
+${PREFIX}ban
+${PREFIX}kick
+${PREFIX}promote
+${PREFIX}demote
+${PREFIX}tag
+${PREFIX}tagall
+${PREFIX}groupinfo
+${PREFIX}listadmin
+${PREFIX}staff
+${PREFIX}link
+${PREFIX}revoke
+${PREFIX}groupname
+${PREFIX}setgdesc
+${PREFIX}left
+
+🎮 *FUN*
+${PREFIX}8ball
+${PREFIX}coinflip
+${PREFIX}roll
+${PREFIX}joke
+${PREFIX}compliment
+${PREFIX}flirt
+${PREFIX}love
+${PREFIX}hug
+${PREFIX}kiss
+${PREFIX}slap
+${PREFIX}fact
+${PREFIX}truth
+${PREFIX}dare
+${PREFIX}rps
+${PREFIX}math
+${PREFIX}waifu
+
+🤖 *AI*
+${PREFIX}ai
+${PREFIX}chatbot
+${PREFIX}tts
+${PREFIX}imagine
+${PREFIX}manga
+${PREFIX}pixelart
+${PREFIX}traduc
+
+🛠️ *TOOLS*
+${PREFIX}sticker
+${PREFIX}photo
+${PREFIX}attp
+${PREFIX}take
+${PREFIX}textmaker
+${PREFIX}url
+${PREFIX}kiki
+
+🎨 *THEMES*
+${PREFIX}theme solo
+${PREFIX}theme naruto
+${PREFIX}theme onepiece
+${PREFIX}theme bleach
+${PREFIX}theme demon
+${PREFIX}theme dragonball
+${PREFIX}theme jujutsu
+${PREFIX}theme aot
+${PREFIX}theme hxh
+${PREFIX}theme blackclover
+
+🍫🎻 *Nicolas Ultra XMD*
+`;
 }
 
-// ======================================================
-// CONNEXION WHATSAPP
-// ======================================================
+// ═══════════════════════════════════════
+// 🤖 BOT
+// ═══════════════════════════════════════
 
-let isStarting = false;
+let sock;
 let reconnectTimer = null;
+let isStarting = false;
+let pairingRequested = false;
 
 async function startBot() {
-
-  if (isStarting) {
-    console.log("⚠️ Une connexion est déjà en cours.");
-    return;
-  }
+  if (isStarting) return;
 
   isStarting = true;
 
   try {
+    if (!fs.existsSync(AUTH_DIR)) {
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
 
     console.log("");
-    console.log("╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮");
-    console.log("┃  🖤 NICOLAS ULTRA XMD");
-    console.log("┃  ⚔️ SHADOW MONARCH");
-    console.log("╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯");
-    console.log("");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🔥 DÉMARRAGE NICOLAS ULTRA XMD");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     const { state, saveCreds } =
       await useMultiFileAuthState(AUTH_DIR);
@@ -1117,265 +246,265 @@ async function startBot() {
       await fetchLatestBaileysVersion();
 
     console.log(
-      "📦 Version Baileys :",
+      "📡 WhatsApp Web version :",
       version.join(".")
     );
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
       version,
+
       auth: state,
+
       logger: pino({
         level: "silent"
       }),
+
       printQRInTerminal: false,
-      browser: [
-        "Nicolas Ultra XMD",
-        "Chrome",
-        "1.0.0"
-      ],
-      markOnlineOnConnect: false
+
+      // Configuration stable pour le pairing
+      browser: Browsers.baileys(BOT_NAME),
+
+      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 10000,
+
+      markOnlineOnConnect: false,
+
+      syncFullHistory: false,
+
+      shouldSyncHistoryMessage: () => false,
+
+      generateHighQualityLinkPreview: false
     });
 
-    // ================================================
-    // SAUVEGARDE AUTH
-    // ================================================
+    sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on(
-      "creds.update",
-      saveCreds
-    );
+    // ═══════════════════════════════════
+    // 🔥 PAIRING CODE
+    // ═══════════════════════════════════
 
-    // ================================================
-    // PAIRING CODE CORRIGÉ
-    // ================================================
+    sock.ev.on("connection.update", async update => {
+      const {
+        connection,
+        lastDisconnect
+      } = update;
 
-    if (!state.creds.registered) {
+      // ─────────────────────────────────
+      // 📱 DEMANDE DU CODE
+      // ─────────────────────────────────
 
-      const phoneNumber =
-        process.env.PAIRING_NUMBER?.trim();
+      if (
+        connection === "connecting" &&
+        !state.creds.registered &&
+        !pairingRequested
+      ) {
+        pairingRequested = true;
 
-      console.log("");
-      console.log(
-        "🔎 PAIRING_NUMBER présent :",
-        Boolean(phoneNumber)
-      );
+        const phoneNumber =
+          process.env.PAIRING_NUMBER?.trim();
 
-      if (!phoneNumber) {
-
-        console.log("");
-        console.log("╭━━━━━━━━━━━━━━━━━━━━━━╮");
-        console.log("┃ ❌ PAIRING_NUMBER");
-        console.log("┃    MANQUANT");
-        console.log("╰━━━━━━━━━━━━━━━━━━━━━━╯");
-        console.log("");
-        console.log(
-          "Railway → Variables →"
-        );
-        console.log(
-          "PAIRING_NUMBER = ton numéro"
-        );
-        console.log("");
-        console.log("⚠️ Sans +");
-        console.log("⚠️ Sans espaces");
-        console.log("⚠️ Sans tirets");
-        console.log("");
-
-      } else {
+        if (!phoneNumber) {
+          console.error("");
+          console.error("❌ PAIRING_NUMBER MANQUANT");
+          console.error(
+            "Ajoute PAIRING_NUMBER dans Railway."
+          );
+          return;
+        }
 
         const cleanNumber =
           phoneNumber.replace(/\D/g, "");
 
-        if (!cleanNumber) {
+        console.log("");
+        console.log(
+          "📱 Numéro de pairing détecté"
+        );
+        console.log(
+          "🔄 Demande du pairing code..."
+        );
 
-          console.log(
-            "❌ PAIRING_NUMBER invalide."
-          );
-
-        } else {
+        try {
+          const code =
+            await sock.requestPairingCode(
+              cleanNumber
+            );
 
           console.log("");
           console.log(
-            "📱 Numéro de pairing détecté."
+            "━━━━━━━━━━━━━━━━━━━━━━╮"
           );
           console.log(
-            "🔐 Génération du Pairing Code..."
-          );
-          console.log("");
-
-          // Petit délai pour laisser la socket démarrer
-          await sleep(3000);
-
-          try {
-
-            const code =
-              await sock.requestPairingCode(
-                cleanNumber
-              );
-
-            console.log("");
-            console.log(
-              "╭━━━━━━━━━━━━━━━━━━━━━━╮"
-            );
-            console.log(
-              "┃ 🔥 PAIRING CODE"
-            );
-            console.log(
-              `┃    ${code}`
-            );
-            console.log(
-              "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-            );
-            console.log("");
-
-            console.log(
-              "📱 WhatsApp → Paramètres"
-            );
-            console.log(
-              "➡️ Appareils connectés"
-            );
-            console.log(
-              "➡️ Connecter un appareil"
-            );
-            console.log(
-              "➡️ Se connecter avec un numéro"
-            );
-            console.log(
-              "➡️ Entre le code"
-            );
-            console.log("");
-
-          } catch (error) {
-
-            console.error("");
-            console.error(
-              "❌ ERREUR PAIRING CODE"
-            );
-            console.error(
-              error?.message || error
-            );
-            console.error("");
-
-          }
-        }
-      }
-    } else {
-
-      console.log(
-        "🔐 Session WhatsApp déjà enregistrée."
-      );
-    }
-
-    // ================================================
-    // CONNEXION
-    // ================================================
-
-    sock.ev.on(
-      "connection.update",
-      async update => {
-
-        const {
-          connection,
-          lastDisconnect
-        } = update;
-
-        if (connection === "open") {
-
-          isStarting = false;
-
-          console.log("");
-          console.log(
-            "╭━━━━━━━━━━━━━━━━━━━━━━╮"
+            "┃ 🔥 PAIRING CODE"
           );
           console.log(
-            "┃ ✅ WHATSAPP CONNECTÉ"
-          );
-          console.log(
-            "┃ 🖤 NICOLAS ULTRA XMD"
-          );
-          console.log(
-            "┃ ⚔️ SHADOW MONARCH"
+            `┃    ${code}`
           );
           console.log(
             "╰━━━━━━━━━━━━━━━━━━━━━━╯"
           );
           console.log("");
-
-        }
-
-        if (connection === "close") {
-
-          isStarting = false;
-
-          const statusCode =
-            lastDisconnect?.error?.output?.statusCode;
-
-          console.log("");
           console.log(
-            "❌ CONNEXION WHATSAPP FERMÉE"
+            "📱 WhatsApp → Paramètres"
           );
           console.log(
-            "📛 Code :",
-            statusCode || "inconnu"
+            "➡️ Appareils connectés"
+          );
+          console.log(
+            "➡️ Connecter un appareil"
+          );
+          console.log(
+            "➡️ Utiliser un numéro de téléphone"
+          );
+          console.log(
+            "➡️ Entre le code affiché ci-dessus"
           );
           console.log("");
 
-          if (
-            statusCode !== DisconnectReason.loggedOut
-          ) {
-
-            if (!reconnectTimer) {
-
-              console.log(
-                "🔄 Reconnexion dans 5 secondes..."
-              );
-
-              reconnectTimer = setTimeout(
-                async () => {
-
-                  reconnectTimer = null;
-
-                  try {
-                    await startBot();
-                  } catch (error) {
-                    console.error(
-                      "❌ Reconnexion impossible :",
-                      error?.message || error
-                    );
-                  }
-
-                },
-                5000
-              );
-            }
-
-          } else {
-
-            console.log(
-              "⚠️ Session WhatsApp déconnectée."
-            );
-            console.log(
-              "⚠️ Une nouvelle authentification sera nécessaire."
-            );
-          }
+        } catch (error) {
+          console.error("");
+          console.error(
+            "❌ ERREUR PAIRING CODE"
+          );
+          console.error(error);
+          console.error("");
         }
       }
-    );
 
-    // ================================================
-    // MESSAGES
-    // ================================================
+      // ─────────────────────────────────
+      // 🟢 CONNECTÉ
+      // ─────────────────────────────────
+
+      if (connection === "open") {
+        console.log("");
+        console.log(
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮"
+        );
+        console.log(
+          "┃ 🟢 WHATSAPP CONNECTÉ !"
+        );
+        console.log(
+          `┃ 🔥 ${BOT_NAME}`
+        );
+        console.log(
+          "┃ ⚔️ Shadow Monarch Mode"
+        );
+        console.log(
+          "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+        );
+        console.log("");
+
+        pairingRequested = false;
+        isStarting = false;
+      }
+
+      // ─────────────────────────────────
+      // 🔴 CONNEXION FERMÉE
+      // ─────────────────────────────────
+
+      if (connection === "close") {
+        isStarting = false;
+
+        const error =
+          lastDisconnect?.error;
+
+        const statusCode =
+          error?.output?.statusCode ||
+          error?.data?.statusCode ||
+          error?.statusCode;
+
+        console.log("");
+        console.log(
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮"
+        );
+        console.log(
+          "┃ 🔴 CONNEXION WHATSAPP FERMÉE"
+        );
+        console.log(
+          "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+        );
+
+        console.log(
+          "📛 Code :",
+          statusCode || "inconnu"
+        );
+
+        if (statusCode === 401) {
+          console.log(
+            "⚠️ Session WhatsApp rejetée."
+          );
+          console.log(
+            "⚠️ Une nouvelle authentification sera nécessaire."
+          );
+
+          pairingRequested = false;
+
+          // On supprime seulement l'ancienne
+          // authentification invalide
+          try {
+            if (fs.existsSync(AUTH_DIR)) {
+              fs.rmSync(AUTH_DIR, {
+                recursive: true,
+                force: true
+              });
+
+              console.log(
+                "🧹 Ancienne session supprimée."
+              );
+            }
+          } catch (cleanupError) {
+            console.error(
+              "⚠️ Impossible de supprimer la session :",
+              cleanupError.message
+            );
+          }
+
+          if (!reconnectTimer) {
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              startBot();
+            }, 5000);
+          }
+
+          return;
+        }
+
+        if (
+          statusCode === DisconnectReason.loggedOut
+        ) {
+          console.log(
+            "🚪 Session déconnectée."
+          );
+          return;
+        }
+
+        // Reconnexion normale
+        if (!reconnectTimer) {
+          console.log(
+            "🔄 Reconnexion dans 5 secondes..."
+          );
+
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            pairingRequested = false;
+            startBot();
+          }, 5000);
+        }
+      }
+    });
+
+    // ═══════════════════════════════════
+    // 💬 MESSAGES
+    // ═══════════════════════════════════
 
     sock.ev.on(
       "messages.upsert",
       async ({ messages }) => {
-
         try {
-
           const message = messages[0];
 
           if (!message) return;
-
           if (message.key.fromMe) return;
+          if (!message.message) return;
 
           const jid =
             message.key.remoteJid;
@@ -1383,9 +512,48 @@ async function startBot() {
           if (!jid) return;
 
           const text =
-            getText(message);
+            getText(message).trim();
 
           if (!text) return;
+
+          const isGroup =
+            isGroupJid(jid);
+
+          const lower =
+            text.toLowerCase();
+
+          // ═══════════════════════════════
+          // 👋 RÉPONSES RAPIDES
+          // ═══════════════════════════════
+
+          if (
+            lower === "salut" ||
+            lower === "slt" ||
+            lower === "yo" ||
+            lower === "bonjour"
+          ) {
+            await sock.sendMessage(jid, {
+              text:
+                "🔥 Salut ! Nicolas Ultra XMD est là 🍫🎻"
+            });
+            return;
+          }
+
+          if (
+            lower === "cv" ||
+            lower === "ça va" ||
+            lower === "ca va"
+          ) {
+            await sock.sendMessage(jid, {
+              text:
+                "Ça va tranquille 😎🔥 et toi ? 🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 📌 COMMANDES
+          // ═══════════════════════════════
 
           if (!text.startsWith(PREFIX)) {
             return;
@@ -1404,86 +572,906 @@ async function startBot() {
 
           const args = parts;
 
-          console.log(
-            `📩 ${PREFIX}${command}`
-          );
+          // ═══════════════════════════════
+          // 🎀 MENU
+          // ═══════════════════════════════
 
-          await handleCommand(
-            sock,
-            message,
-            command,
-            args
-          );
+          if (command === "menu") {
+            await sock.sendMessage(jid, {
+              text: menuText()
+            });
+
+            const reactions = [
+              "🎀",
+              "🪄",
+              "🍫",
+              "🎻",
+              "🍟",
+              "🍎",
+              "🧿",
+              "💎"
+            ];
+
+            for (const emoji of reactions) {
+              await sleep(350);
+              await react(
+                sock,
+                jid,
+                message,
+                emoji
+              );
+            }
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🟢 ALIVE
+          // ═══════════════════════════════
+
+          if (command === "alive") {
+            await sock.sendMessage(jid, {
+              text:
+                `🔥 *${BOT_NAME} EST EN LIGNE*\n\n` +
+                `⚔️ Version : ${VERSION}\n` +
+                `👑 Owner : ${OWNER_NAME}\n` +
+                `🟢 Status : Online\n\n` +
+                `🍫🎻`
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🏓 PING
+          // ═══════════════════════════════
+
+          if (command === "ping") {
+            const start = Date.now();
+
+            await sock.sendMessage(jid, {
+              text: "🏓 Calcul de la vitesse..."
+            });
+
+            const speed =
+              Date.now() - start;
+
+            await sock.sendMessage(jid, {
+              text:
+                `🏓 Pong !\n⚡ ${speed} ms\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // ⚡ SPEED
+          // ═══════════════════════════════
+
+          if (command === "speed") {
+            const start = Date.now();
+
+            await sock.sendMessage(jid, {
+              text:
+                `⚡ Speed test : ${
+                  Date.now() - start
+                } ms\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 👑 OWNER
+          // ═══════════════════════════════
+
+          if (command === "owner") {
+            await sock.sendMessage(jid, {
+              text:
+                `👑 *OWNER*\n\n` +
+                `🔥 ${OWNER_NAME}\n` +
+                `📱 WhatsApp : +${OWNER_NUMBER}\n` +
+                `✈️ Telegram : ${OWNER_TELEGRAM}\n\n` +
+                `🍫🎻`
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🔗 REPO
+          // ═══════════════════════════════
+
+          if (command === "repo") {
+            await sock.sendMessage(jid, {
+              text:
+                "🔥 Nicolas Ultra XMD\n" +
+                "⚔️ Shadow Monarch Edition\n" +
+                "📦 GitHub : nicolas-ultra-xmd\n\n" +
+                "🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🎨 THEME
+          // ═══════════════════════════════
+
+          if (command === "theme") {
+            const theme =
+              args[0]?.toLowerCase();
+
+            if (!theme) {
+              await sock.sendMessage(jid, {
+                text:
+                  "🎨 *THÈMES DISPONIBLES*\n\n" +
+                  THEMES
+                    .map(t => `• ${t}`)
+                    .join("\n") +
+                  "\n\nExemple : .theme solo\n🍫🎻"
+              });
+              return;
+            }
+
+            if (!THEMES.includes(theme)) {
+              await sock.sendMessage(jid, {
+                text:
+                  `❌ Thème inconnu.\n\n` +
+                  `Thèmes disponibles :\n` +
+                  THEMES.join(", ") +
+                  "\n\n🍫🎻"
+              });
+              return;
+            }
+
+            await sock.sendMessage(jid, {
+              text:
+                `🎨 Thème changé : *${theme}*\n⚔️ Shadow Monarch activé !\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🎱 8BALL
+          // ═══════════════════════════════
+
+          if (command === "8ball") {
+            const answers = [
+              "Oui 😎",
+              "Non 😂",
+              "Peut-être 👀",
+              "Très probablement 🔥",
+              "Impossible 💀",
+              "Demande encore plus tard 🗿",
+              "Les étoiles disent oui ✨",
+              "J'en sais rien frère 😭"
+            ];
+
+            await sock.sendMessage(jid, {
+              text:
+                `🎱 ${randomItem(answers)}\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🪙 COINFLIP
+          // ═══════════════════════════════
+
+          if (command === "coinflip") {
+            await sock.sendMessage(jid, {
+              text:
+                `🪙 Résultat : ${
+                  Math.random() > 0.5
+                    ? "PILE"
+                    : "FACE"
+                }\n🍫🎻`
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🎲 ROLL
+          // ═══════════════════════════════
+
+          if (command === "roll") {
+            const max =
+              parseInt(args[0]) || 6;
+
+            const result =
+              Math.floor(
+                Math.random() * max
+              ) + 1;
+
+            await sock.sendMessage(jid, {
+              text:
+                `🎲 Résultat : *${result}*\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 😂 BLAGUE
+          // ═══════════════════════════════
+
+          if (
+            command === "joke" ||
+            command === "blague"
+          ) {
+            const jokes = [
+              "Pourquoi les développeurs aiment-ils le dark mode ? Parce que la lumière attire les bugs. 💀",
+              "Mon code fonctionne parfaitement... jusqu'à ce que quelqu'un le regarde. 😭",
+              "Pourquoi le bot est célibataire ? Parce qu'il n'a pas de connexion. 😂"
+            ];
+
+            await sock.sendMessage(jid, {
+              text:
+                `😂 ${randomItem(jokes)}\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // ❤️ LOVE
+          // ═══════════════════════════════
+
+          if (command === "love") {
+            await sock.sendMessage(jid, {
+              text:
+                "❤️ L'amour c'est compliqué frère... mais ça vaut parfois le coup. 😭❤️\n🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 😎 COMPLIMENT
+          // ═══════════════════════════════
+
+          if (command === "compliment") {
+            await sock.sendMessage(jid, {
+              text:
+                `😎 T'as une énergie de personnage principal 🔥\n🍫🎻`
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 😏 FLIRT
+          // ═══════════════════════════════
+
+          if (command === "flirt") {
+            await sock.sendMessage(jid, {
+              text:
+                "😏 Si le charme était une commande, je crois que tu serais déjà en mode admin. 😂❤️\n🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🤗 HUG
+          // ═══════════════════════════════
+
+          if (command === "hug") {
+            await sock.sendMessage(jid, {
+              text:
+                "🤗 *Câlin virtuel envoyé !*\n🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 💋 KISS
+          // ═══════════════════════════════
+
+          if (command === "kiss") {
+            await sock.sendMessage(jid, {
+              text:
+                "💋 Bisou virtuel envoyé 😭❤️\n🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 👋 SLAP
+          // ═══════════════════════════════
+
+          if (command === "slap") {
+            await sock.sendMessage(jid, {
+              text:
+                "👋 *PAF !* Réveille-toi frère 😂\n🍫🎻"
+            });
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 🧠 FACT
+          // ═══════════════════════════════
+
+          if (command === "fact") {
+            const facts = [
+              "🧠 Les poulpes ont trois cœurs.",
+              "🌍 La Terre tourne autour du Soleil.",
+              "⚡ La lumière voyage extrêmement rapidement.",
+              "🐙 Les poulpes peuvent changer de couleur."
+            ];
+
+            await sock.sendMessage(jid, {
+              text:
+                `${randomItem(facts)}\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // ✋ TRUTH
+          // ═══════════════════════════════
+
+          if (command === "truth") {
+            const truths = [
+              "👀 Qui est ton crush ?",
+              "😂 Quelle est ta plus grosse honte ?",
+              "❤️ As-tu déjà aimé quelqu'un en secret ?",
+              "💀 Quel est ton plus gros mensonge ?"
+            ];
+
+            await sock.sendMessage(jid, {
+              text:
+                `✋ ${randomItem(truths)}\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 😈 DARE
+          // ═══════════════════════════════
+
+          if (command === "dare") {
+            const dares = [
+              "😂 Envoie un emoji au hasard à la dernière personne à qui tu as parlé.",
+              "🔥 Change ta photo de profil pendant 5 minutes.",
+              "💀 Écris simplement « je suis un génie » dans le groupe."
+            ];
+
+            await sock.sendMessage(jid, {
+              text:
+                `😈 ${randomItem(dares)}\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // ✊ RPS
+          // ═══════════════════════════════
+
+          if (command === "rps") {
+            const choices = [
+              "pierre",
+              "papier",
+              "ciseaux"
+            ];
+
+            const botChoice =
+              randomItem(choices);
+
+            await sock.sendMessage(jid, {
+              text:
+                `✊ Mon choix : *${botChoice}*\n🍫🎻`
+            });
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // ➕ MATH
+          // ═══════════════════════════════
+
+          if (command === "math") {
+            const expression =
+              args.join(" ");
+
+            if (!expression) {
+              await sock.sendMessage(jid, {
+                text:
+                  "🧮 Exemple : .math 25 + 25\n🍫🎻"
+              });
+              return;
+            }
+
+            if (
+              !/^[0-9+\-*/().\s]+$/.test(
+                expression
+              )
+            ) {
+              await sock.sendMessage(jid, {
+                text:
+                  "❌ Expression invalide.\n🍫🎻"
+              });
+              return;
+            }
+
+            try {
+              const result =
+                Function(
+                  `"use strict"; return (${expression})`
+                )();
+
+              await sock.sendMessage(jid, {
+                text:
+                  `🧮 ${expression} = *${result}*\n🍫🎻`
+              });
+            } catch {
+              await sock.sendMessage(jid, {
+                text:
+                  "❌ Impossible de calculer.\n🍫🎻"
+              });
+            }
+
+            return;
+          }
+
+          // ═══════════════════════════════
+          // 👥 COMMANDES GROUPES
+          // ═══════════════════════════════
+
+          if (
+            [
+              "add",
+              "ban",
+              "kick",
+              "promote",
+              "demote",
+              "tag",
+              "tagall",
+              "groupinfo",
+              "listadmin",
+              "staff",
+              "link",
+              "revoke",
+              "groupname",
+              "setgdesc",
+              "left"
+            ].includes(command)
+          ) {
+            if (!isGroup) {
+              await sock.sendMessage(jid, {
+                text:
+                  "❌ Cette commande fonctionne uniquement dans un groupe.\n🍫🎻"
+              });
+              return;
+            }
+
+            const admin =
+              await isAdmin(
+                sock,
+                jid,
+                message.key.participant ||
+                  message.key.remoteJid
+              );
+
+            // ─────────────────────────────
+            // GROUPINFO
+            // ─────────────────────────────
+
+            if (command === "groupinfo") {
+              const metadata =
+                await sock.groupMetadata(jid);
+
+              await sock.sendMessage(jid, {
+                text:
+                  `👥 *GROUP INFO*\n\n` +
+                  `📛 Nom : ${metadata.subject}\n` +
+                  `👤 Membres : ${metadata.participants.length}\n` +
+                  `📝 Description : ${metadata.desc || "Aucune"}\n\n` +
+                  `🍫🎻`
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // STAFF
+            // ─────────────────────────────
+
+            if (
+              command === "staff" ||
+              command === "listadmin"
+            ) {
+              const admins =
+                await getGroupAdmins(
+                  sock,
+                  jid
+                );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `👑 *STAFF*\n\n` +
+                  admins
+                    .map(
+                      (id, i) =>
+                        `${i + 1}. @${jidToNumber(id)}`
+                    )
+                    .join("\n") +
+                  "\n\n🍫🎻",
+                mentions: admins
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // TAGALL
+            // ─────────────────────────────
+
+            if (command === "tagall") {
+              const metadata =
+                await sock.groupMetadata(jid);
+
+              const members =
+                metadata.participants.map(
+                  p => p.id
+                );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `📢 *TAG ALL*\n\n` +
+                  members
+                    .map(
+                      id =>
+                        `@${jidToNumber(id)}`
+                    )
+                    .join(" ") +
+                  "\n\n🍫🎻",
+                mentions: members
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // TAG
+            // ─────────────────────────────
+
+            if (command === "tag") {
+              const metadata =
+                await sock.groupMetadata(jid);
+
+              const members =
+                metadata.participants.map(
+                  p => p.id
+                );
+
+              await sock.sendMessage(jid, {
+                text:
+                  members
+                    .map(
+                      id =>
+                        `@${jidToNumber(id)}`
+                    )
+                    .join(" ") +
+                  "\n🍫🎻",
+                mentions: members
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // COMMANDES ADMIN
+            // ─────────────────────────────
+
+            if (!admin) {
+              await sock.sendMessage(jid, {
+                text:
+                  "❌ Cette commande nécessite les droits administrateur.\n🍫🎻"
+              });
+              return;
+            }
+
+            // ─────────────────────────────
+            // KICK / BAN
+            // ─────────────────────────────
+
+            if (
+              command === "kick" ||
+              command === "ban"
+            ) {
+              const target =
+                getTargetJid(
+                  message,
+                  args
+                );
+
+              if (!target) {
+                await sock.sendMessage(jid, {
+                  text:
+                    `❌ Mentionne quelqu'un.\nExemple : ${PREFIX}${command} @user\n🍫🎻`
+                });
+                return;
+              }
+
+              await sock.groupParticipantsUpdate(
+                jid,
+                [target],
+                "remove"
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `🚫 @${jidToNumber(target)} a été retiré du groupe.\n🍫🎻`,
+                mentions: [target]
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // ADD
+            // ─────────────────────────────
+
+            if (command === "add") {
+              const number =
+                args[0]?.replace(/\D/g, "");
+
+              if (!number) {
+                await sock.sendMessage(jid, {
+                  text:
+                    "❌ Exemple : .add 242XXXXXXXXX\n🍫🎻"
+                });
+                return;
+              }
+
+              const target =
+                `${number}@s.whatsapp.net`;
+
+              await sock.groupParticipantsUpdate(
+                jid,
+                [target],
+                "add"
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `✅ @${number} ajouté au groupe.\n🍫🎻`,
+                mentions: [target]
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // PROMOTE
+            // ─────────────────────────────
+
+            if (command === "promote") {
+              const target =
+                getTargetJid(
+                  message,
+                  args
+                );
+
+              if (!target) {
+                await sock.sendMessage(jid, {
+                  text:
+                    "❌ Mentionne la personne à promouvoir.\n🍫🎻"
+                });
+                return;
+              }
+
+              await sock.groupParticipantsUpdate(
+                jid,
+                [target],
+                "promote"
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `👑 @${jidToNumber(target)} est maintenant admin.\n🍫🎻`,
+                mentions: [target]
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // DEMOTE
+            // ─────────────────────────────
+
+            if (command === "demote") {
+              const target =
+                getTargetJid(
+                  message,
+                  args
+                );
+
+              if (!target) {
+                await sock.sendMessage(jid, {
+                  text:
+                    "❌ Mentionne l'admin à rétrograder.\n🍫🎻"
+                });
+                return;
+              }
+
+              await sock.groupParticipantsUpdate(
+                jid,
+                [target],
+                "demote"
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `⬇️ @${jidToNumber(target)} n'est plus admin.\n🍫🎻`,
+                mentions: [target]
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // LINK
+            // ─────────────────────────────
+
+            if (command === "link") {
+              const code =
+                await sock.groupInviteCode(jid);
+
+              await sock.sendMessage(jid, {
+                text:
+                  `🔗 *LIEN DU GROUPE*\n\nhttps://chat.whatsapp.com/${code}\n\n🍫🎻`
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // REVOKE
+            // ─────────────────────────────
+
+            if (command === "revoke") {
+              await sock.groupRevokeInvite(jid);
+
+              await sock.sendMessage(jid, {
+                text:
+                  "🔐 L'ancien lien du groupe a été révoqué.\n🍫🎻"
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // GROUPNAME
+            // ─────────────────────────────
+
+            if (command === "groupname") {
+              const newName =
+                args.join(" ").trim();
+
+              if (!newName) {
+                await sock.sendMessage(jid, {
+                  text:
+                    "❌ Exemple : .groupname Nicolas Squad\n🍫🎻"
+                });
+                return;
+              }
+
+              await sock.groupUpdateSubject(
+                jid,
+                newName
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  `✅ Nom changé en *${newName}*\n🍫🎻`
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // SETGDESC
+            // ─────────────────────────────
+
+            if (command === "setgdesc") {
+              const description =
+                args.join(" ").trim();
+
+              if (!description) {
+                await sock.sendMessage(jid, {
+                  text:
+                    "❌ Exemple : .setgdesc Bienvenue dans le groupe\n🍫🎻"
+                });
+                return;
+              }
+
+              await sock.groupUpdateDescription(
+                jid,
+                description
+              );
+
+              await sock.sendMessage(jid, {
+                text:
+                  "✅ Description du groupe modifiée.\n🍫🎻"
+              });
+
+              return;
+            }
+
+            // ─────────────────────────────
+            // LEFT
+            // ─────────────────────────────
+
+            if (command === "left") {
+              await sock.sendMessage(jid, {
+                text:
+                  "👋 Nicolas Ultra XMD quitte le groupe.\n🍫🎻"
+              });
+
+              await sleep(1000);
+
+              await sock.groupLeave(jid);
+
+              return;
+            }
+          }
+
+          // ═══════════════════════════════
+          // ❓ COMMANDE INCONNUE
+          // ═══════════════════════════════
+
+          await sock.sendMessage(jid, {
+            text:
+              `❓ Commande inconnue : *${PREFIX}${command}*\n\n` +
+              `Utilise *${PREFIX}menu* pour voir les commandes.\n🍫🎻`
+          });
 
         } catch (error) {
-
           console.error(
-            "❌ Message error:",
-            error?.message || error
+            "❌ ERREUR MESSAGE :",
+            error
           );
-
         }
       }
     );
 
   } catch (error) {
+    console.error("");
+    console.error(
+      "❌ ERREUR DÉMARRAGE :",
+      error
+    );
 
     isStarting = false;
 
-    console.error(
-      "❌ ERREUR STARTBOT:",
-      error?.message || error
-    );
-
     if (!reconnectTimer) {
-
-      reconnectTimer = setTimeout(
-        async () => {
-
-          reconnectTimer = null;
-
-          try {
-            await startBot();
-          } catch (err) {
-            console.error(
-              "❌ Nouvelle tentative impossible:",
-              err?.message || err
-            );
-          }
-
-        },
-        10000
-      );
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        pairingRequested = false;
+        startBot();
+      }, 5000);
     }
   }
 }
 
-// ======================================================
-// PROTECTION
-// ======================================================
+// ═══════════════════════════════════════
+// 🚀 START
+// ═══════════════════════════════════════
 
-process.on(
-  "uncaughtException",
-  error => {
-    console.error(
-      "❌ UNCAUGHT EXCEPTION:",
-      error
-    );
-  }
-);
+process.on("uncaughtException", error => {
+  console.error(
+    "❌ UNCAUGHT EXCEPTION :",
+    error
+  );
+});
 
-process.on(
-  "unhandledRejection",
-  error => {
-    console.error(
-      "❌ UNHANDLED REJECTION:",
-      error
-    );
-  }
-);
-
-// ======================================================
-// START
-// ======================================================
+process.on("unhandledRejection", error => {
+  console.error(
+    "❌ UNHANDLED REJECTION :",
+    error
+  );
+});
 
 startBot();
