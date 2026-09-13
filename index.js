@@ -10,10 +10,6 @@ const {
 const pino = require("pino");
 const fs = require("fs");
 
-// ═══════════════════════════════════════
-// 🔥 NICOLAS ULTRA XMD
-// ═══════════════════════════════════════
-
 const BOT_NAME = "NICOLAS ULTRA XMD";
 const VERSION = "1.0.0";
 const PREFIX = ".";
@@ -36,10 +32,6 @@ const THEMES = [
   "hxh",
   "blackclover"
 ];
-
-// ═══════════════════════════════════════
-// 🧰 OUTILS
-// ═══════════════════════════════════════
 
 const sleep = ms =>
   new Promise(resolve => setTimeout(resolve, ms));
@@ -120,10 +112,6 @@ function getTargetJid(message, args) {
 
   return null;
 }
-
-// ═══════════════════════════════════════
-// 📋 MENU
-// ═══════════════════════════════════════
 
 function menuText() {
   return `
@@ -210,19 +198,11 @@ ${PREFIX}theme blackclover
 `;
 }
 
-// ═══════════════════════════════════════
-// 🔥 VARIABLES
-// ═══════════════════════════════════════
-
 let sock = null;
 let reconnectTimer = null;
 let starting = false;
 let pairingRequested = false;
 let pairingTimeout = null;
-
-// ═══════════════════════════════════════
-// 🚀 DÉMARRAGE
-// ═══════════════════════════════════════
 
 async function startBot() {
   if (starting) return;
@@ -271,9 +251,6 @@ async function startBot() {
 
       printQRInTerminal: false,
 
-      // Navigateur standard pour éviter
-      // les problèmes de pairing liés
-      // aux identifiants personnalisés.
       browser: [
         "Ubuntu",
         "Chrome",
@@ -300,15 +277,10 @@ async function startBot() {
       saveCreds
     );
 
-    // ═══════════════════════════════════
-    // 🔌 CONNEXION WHATSAPP
-    // ═══════════════════════════════════
-
     sock.ev.on(
       "connection.update",
       async update => {
 
-        // Affichage complet pour diagnostic
         console.log(
           "📡 UPDATE WHATSAPP :",
           JSON.stringify(
@@ -333,10 +305,6 @@ async function startBot() {
           "📡 QR reçu :",
           Boolean(qr)
         );
-
-        // ═══════════════════════════════
-        // 📱 PAIRING CODE
-        // ═══════════════════════════════
 
         if (
           !state.creds.registered &&
@@ -497,10 +465,6 @@ async function startBot() {
             );
         }
 
-        // ═══════════════════════════════
-        // 🟢 CONNECTÉ
-        // ═══════════════════════════════
-
         if (
           connection === "open"
         ) {
@@ -537,17 +501,11 @@ async function startBot() {
           console.log("");
 
           try {
-
             await sock.sendPresenceUpdate(
               "available"
             );
-
           } catch {}
         }
-
-        // ═══════════════════════════════
-        // 🔴 FERMETURE
-        // ═══════════════════════════════
 
         if (
           connection === "close"
@@ -594,10 +552,6 @@ async function startBot() {
             "inconnue"
           );
 
-          // ═════════════════════════════
-          // 401 = SESSION INVALIDE
-          // ═════════════════════════════
-
           if (
             statusCode === 401
           ) {
@@ -638,10 +592,6 @@ async function startBot() {
             }
           }
 
-          // ═════════════════════════════
-          // 428 = SOCKET FERMÉ
-          // ═════════════════════════════
-
           if (
             statusCode === 428
           ) {
@@ -657,10 +607,6 @@ async function startBot() {
             pairingRequested = false;
           }
 
-          // ═════════════════════════════
-          // LOGGED OUT
-          // ═════════════════════════════
-
           if (
             statusCode ===
             DisconnectReason.loggedOut
@@ -672,10 +618,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // RECONNEXION
-          // ═════════════════════════════
 
           if (
             !reconnectTimer
@@ -703,10 +645,6 @@ async function startBot() {
       }
     );
 
-    // ═══════════════════════════════════
-    // 💬 MESSAGES
-    // ═══════════════════════════════════
-
     sock.ev.on(
       "messages.upsert",
       async ({ messages }) => {
@@ -717,14 +655,7 @@ async function startBot() {
             messages[0];
 
           if (!message) return;
-
-          if (
-            message.key.fromMe
-          ) return;
-
-          if (
-            !message.message
-          ) return;
+          if (!message.message) return;
 
           const jid =
             message.key.remoteJid;
@@ -736,62 +667,73 @@ async function startBot() {
 
           if (!text) return;
 
+          /*
+           * IMPORTANT :
+           * Le compte connecté est celui de Nicolas.
+           * On autorise donc les commandes envoyées
+           * depuis son propre compte.
+           *
+           * Mais on ignore ses autres messages afin
+           * d'éviter que le bot réponde en boucle.
+           */
+          if (
+            message.key.fromMe &&
+            !text.startsWith(PREFIX)
+          ) {
+            return;
+          }
+
           const lower =
             text.toLowerCase();
 
           const isGroup =
             isGroupJid(jid);
 
-          // ═════════════════════════════
-          // 👋 RÉPONSES RAPIDES
-          // ═════════════════════════════
-
-          if (
-            [
-              "salut",
-              "slt",
-              "yo",
-              "bonjour"
-            ].includes(lower)
-          ) {
-
-            await sock.sendMessage(
-              jid,
-              {
-                text:
-                  "🔥 Salut ! Nicolas Ultra XMD est là 🍫🎻"
-              }
-            );
-
-            return;
-          }
-
-          if (
-            [
-              "cv",
-              "ça va",
-              "ca va"
-            ].includes(lower)
-          ) {
-
-            await sock.sendMessage(
-              jid,
-              {
-                text:
-                  "Ça va tranquille 😎🔥 et toi ? 🍫🎻"
-              }
-            );
-
-            return;
-          }
-
-          // ═════════════════════════════
-          // 📌 COMMANDES
-          // ═════════════════════════════
-
           if (
             !text.startsWith(PREFIX)
-          ) return;
+          ) {
+
+            if (
+              [
+                "salut",
+                "slt",
+                "yo",
+                "bonjour"
+              ].includes(lower)
+            ) {
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "🔥 Salut ! Nicolas Ultra XMD est là 🍫🎻"
+                }
+              );
+
+              return;
+            }
+
+            if (
+              [
+                "cv",
+                "ça va",
+                "ca va"
+              ].includes(lower)
+            ) {
+
+              await sock.sendMessage(
+                jid,
+                {
+                  text:
+                    "Ça va tranquille 😎🔥 et toi ? 🍫🎻"
+                }
+              );
+
+              return;
+            }
+
+            return;
+          }
 
           const body =
             text
@@ -809,10 +751,6 @@ async function startBot() {
               .toLowerCase();
 
           const args = parts;
-
-          // ═════════════════════════════
-          // 🎀 MENU
-          // ═════════════════════════════
 
           if (
             command === "menu"
@@ -854,10 +792,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 🟢 ALIVE
-          // ═════════════════════════════
-
           if (
             command === "alive"
           ) {
@@ -876,10 +810,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🏓 PING
-          // ═════════════════════════════
 
           if (
             command === "ping"
@@ -910,10 +840,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // ⚡ SPEED
-          // ═════════════════════════════
-
           if (
             command === "speed"
           ) {
@@ -935,10 +861,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 👑 OWNER
-          // ═════════════════════════════
-
           if (
             command === "owner"
           ) {
@@ -958,10 +880,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 🔗 REPO
-          // ═════════════════════════════
-
           if (
             command === "repo"
           ) {
@@ -979,10 +897,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🎨 THEME
-          // ═════════════════════════════
 
           if (
             command === "theme"
@@ -1038,10 +952,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 🎱 8BALL
-          // ═════════════════════════════
-
           if (
             command === "8ball"
           ) {
@@ -1069,10 +979,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 🪙 COINFLIP
-          // ═════════════════════════════
-
           if (
             command === "coinflip"
           ) {
@@ -1091,10 +997,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🎲 ROLL
-          // ═════════════════════════════
 
           if (
             command === "roll"
@@ -1118,10 +1020,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 😂 BLAGUE
-          // ═════════════════════════════
 
           if (
             command === "joke" ||
@@ -1147,10 +1045,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // ❤️ LOVE
-          // ═════════════════════════════
-
           if (
             command === "love"
           ) {
@@ -1165,10 +1059,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 😎 COMPLIMENT
-          // ═════════════════════════════
 
           if (
             command === "compliment"
@@ -1185,10 +1075,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 😏 FLIRT
-          // ═════════════════════════════
-
           if (
             command === "flirt"
           ) {
@@ -1203,10 +1089,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🤗 HUG
-          // ═════════════════════════════
 
           if (
             command === "hug"
@@ -1223,10 +1105,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 💋 KISS
-          // ═════════════════════════════
-
           if (
             command === "kiss"
           ) {
@@ -1242,10 +1120,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 👋 SLAP
-          // ═════════════════════════════
-
           if (
             command === "slap"
           ) {
@@ -1260,10 +1134,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🧠 FACT
-          // ═════════════════════════════
 
           if (
             command === "fact"
@@ -1288,10 +1158,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // ✋ TRUTH
-          // ═════════════════════════════
-
           if (
             command === "truth"
           ) {
@@ -1315,10 +1181,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 😈 DARE
-          // ═════════════════════════════
-
           if (
             command === "dare"
           ) {
@@ -1341,10 +1203,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // ✊ RPS
-          // ═════════════════════════════
 
           if (
             command === "rps"
@@ -1370,10 +1228,6 @@ async function startBot() {
 
             return;
           }
-
-          // ═════════════════════════════
-          // 🧮 MATH
-          // ═════════════════════════════
 
           if (
             command === "math"
@@ -1441,10 +1295,6 @@ async function startBot() {
             return;
           }
 
-          // ═════════════════════════════
-          // 👥 COMMANDES GROUPES
-          // ═════════════════════════════
-
           const groupCommands = [
             "add",
             "ban",
@@ -1493,7 +1343,6 @@ async function startBot() {
                 sender
               );
 
-            // GROUP INFO
             if (
               command === "groupinfo"
             ) {
@@ -1520,7 +1369,6 @@ async function startBot() {
               return;
             }
 
-            // STAFF
             if (
               command === "staff" ||
               command === "listadmin"
@@ -1551,7 +1399,6 @@ async function startBot() {
               return;
             }
 
-            // TAG ALL
             if (
               command === "tagall" ||
               command === "tag"
@@ -1605,7 +1452,6 @@ async function startBot() {
                 args
               );
 
-            // KICK / BAN
             if (
               command === "kick" ||
               command === "ban"
@@ -1646,7 +1492,6 @@ async function startBot() {
               return;
             }
 
-            // ADD
             if (
               command === "add"
             ) {
@@ -1693,7 +1538,6 @@ async function startBot() {
               return;
             }
 
-            // PROMOTE
             if (
               command === "promote"
             ) {
@@ -1733,7 +1577,6 @@ async function startBot() {
               return;
             }
 
-            // DEMOTE
             if (
               command === "demote"
             ) {
@@ -1773,7 +1616,6 @@ async function startBot() {
               return;
             }
 
-            // LINK
             if (
               command === "link"
             ) {
@@ -1794,7 +1636,6 @@ async function startBot() {
               return;
             }
 
-            // REVOKE
             if (
               command === "revoke"
             ) {
@@ -1814,7 +1655,6 @@ async function startBot() {
               return;
             }
 
-            // GROUPNAME
             if (
               command === "groupname"
             ) {
@@ -1851,7 +1691,6 @@ async function startBot() {
               return;
             }
 
-            // SETGDESC
             if (
               command === "setgdesc"
             ) {
@@ -1888,7 +1727,6 @@ async function startBot() {
               return;
             }
 
-            // LEFT
             if (
               command === "left"
             ) {
@@ -1910,10 +1748,6 @@ async function startBot() {
               return;
             }
           }
-
-          // ═════════════════════════════
-          // ❓ COMMANDE INCONNUE
-          // ═════════════════════════════
 
           await sock.sendMessage(
             jid,
@@ -1962,10 +1796,6 @@ async function startBot() {
   }
 }
 
-// ═══════════════════════════════════════
-// 🛡️ ERREURS
-// ═══════════════════════════════════════
-
 process.on(
   "uncaughtException",
   error => {
@@ -1987,9 +1817,5 @@ process.on(
     );
   }
 );
-
-// ═══════════════════════════════════════
-// 🚀 START
-// ═══════════════════════════════════════
 
 startBot();
