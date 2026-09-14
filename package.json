@@ -1,16 +1,18 @@
 {
   "name": "nicolas-ultra-xmd",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "Nicolas Ultra XMD - Shadow Monarch WhatsApp Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
+    "@distube/ytdl-core": "latest",
     "@whiskeysockets/baileys": "6.7.24",
     "axios": "latest",
     "dotenv": "latest",
     "pino": "latest",
-    "qrcode-terminal": "latest"
+    "qrcode-terminal": "latest",
+    "yt-search": "latest"
   }
 }
