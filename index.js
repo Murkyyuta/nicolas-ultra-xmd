@@ -2951,10 +2951,6 @@ async function requestPairingCode(
     pairingRequested ||
     pairingInProgress
   ) {
-    console.log(
-      "⏳ Une demande de pairing est déjà en cours."
-    );
-
     return false;
   }
 
@@ -2970,7 +2966,7 @@ async function requestPairingCode(
       "❌ PAIRING_NUMBER est absent de Railway."
     );
     console.error(
-      "👉 Variable attendue : PAIRING_NUMBER"
+      "👉 Ajoute la variable PAIRING_NUMBER dans Railway."
     );
     console.error("");
 
@@ -2996,10 +2992,6 @@ async function requestPairingCode(
     !currentSocket ||
     currentSocket !== sock
   ) {
-    console.error(
-      "❌ Socket WhatsApp indisponible."
-    );
-
     return false;
   }
 
@@ -3021,16 +3013,15 @@ async function requestPairingCode(
   try {
     console.log("");
     console.log(
-      "⏳ Socket prêt pour le pairing."
+      "⏳ Préparation du code de pairing..."
     );
 
     /*
-     * Petit délai de sécurité.
-     *
-     * requestPairingCode() doit être appelé après
-     * que le socket ait commencé sa connexion.
+     * IMPORTANT :
+     * On attend que le socket ait réellement
+     * initialisé le canal WhatsApp.
      */
-    await sleep(1200);
+    await sleep(1500);
 
     if (
       generation !== botGeneration ||
@@ -3043,18 +3034,18 @@ async function requestPairingCode(
       state.creds.registered
     ) {
       console.log(
-        "✅ Session enregistrée avant la demande du code."
+        "✅ Session enregistrée avant le pairing."
       );
 
       return false;
     }
 
     console.log(
-      `📱 Numéro de pairing : ${pairingNumber}`
+      `📱 Numéro : ${pairingNumber}`
     );
 
     console.log(
-      "📱 Demande du code de pairing..."
+      "📱 Demande du code à WhatsApp..."
     );
 
     const code =
@@ -3066,10 +3057,6 @@ async function requestPairingCode(
       currentSocket !== sock ||
       generation !== botGeneration
     ) {
-      console.log(
-        "⚠️ Ancien socket de pairing ignoré."
-      );
-
       return false;
     }
 
@@ -3129,7 +3116,11 @@ async function requestPairingCode(
     );
 
     console.log(
-      "⏳ Garde Railway ouvert pendant toute la liaison."
+      "⏳ Ne redémarre PAS Railway pendant la liaison."
+    );
+
+    console.log(
+      "⚠️ Un seul code sera demandé pour ce socket."
     );
 
     console.log("");
@@ -3147,25 +3138,23 @@ async function requestPairingCode(
       errorMessage
     );
 
-    /*
-     * On libère le verrou uniquement si la demande
-     * n'a pas abouti. Le socket courant sera ensuite
-     * géré par connection.update.
-     */
     pairingRequested =
       false;
 
+    pairingInProgress =
+      false;
+
+    /*
+     * Si WhatsApp ferme le canal immédiatement,
+     * on laisse connection.update décider quoi faire.
+     */
     if (
       /401|428|405|515|connection closed|connection failure|bad-request/i.test(
         errorMessage
       )
     ) {
       console.error(
-        "⚠️ WhatsApp a refusé/interrompu le pairing."
-      );
-
-      console.error(
-        "🔄 Le prochain socket utilisera une nouvelle tentative."
+        "⚠️ WhatsApp a refusé/interrompu la demande de pairing."
       );
     }
 
@@ -3341,14 +3330,18 @@ async function startBot() {
           "silent"
       }),
 
+      /*
+       * QR désactivé.
+       *
+       * On utilise le QR interne de Baileys uniquement
+       * comme signal pour savoir que le canal de
+       * connexion est prêt pour le pairing code.
+       */
       printQRInTerminal:
         false,
 
       /*
        * Browser canonique.
-       *
-       * Évite les labels personnalisés qui peuvent
-       * générer des codes de pairing refusés.
        */
       browser:
         Browsers.macOS(
@@ -3418,12 +3411,6 @@ async function startBot() {
           qr
         } = update;
 
-        /*
-         * On garde le QR complètement désactivé.
-         * Le bloc existe seulement pour détecter le
-         * moment où WhatsApp signale que le socket est prêt.
-         */
-
         // =====================
         // CONNECTING
         // =====================
@@ -3436,61 +3423,72 @@ async function startBot() {
             "🔄 Connexion à WhatsApp..."
           );
 
-          if (
-            !state.creds.registered &&
-            !pairingRequested &&
-            !pairingInProgress &&
-            !pairingTimer
-          ) {
-            console.log(
-              "📱 Préparation du pairing..."
-            );
-
-            pairingTimer =
-              setTimeout(
-                async () => {
-                  pairingTimer =
-                    null;
-
-                  if (
-                    newSocket !== sock ||
-                    generation !== botGeneration
-                  ) {
-                    return;
-                  }
-
-                  if (
-                    state.creds.registered
-                  ) {
-                    return;
-                  }
-
-                  await requestPairingCode(
-                    state,
-                    generation,
-                    newSocket
-                  );
-                },
-                1800
-              );
-          }
-
+          /*
+           * IMPORTANT :
+           *
+           * NE PAS demander le pairing ici.
+           *
+           * WhatsApp peut encore être en train
+           * d'initialiser le canal.
+           */
           return;
         }
 
-        /*
-         * Certaines versions de Baileys peuvent émettre
-         * un événement QR même quand on demande un pairing.
-         *
-         * On NE l'affiche jamais.
-         */
+        // ==================================================
+        // QR SIGNAL → PAIRING CODE
+        // ==================================================
+
         if (
           qr &&
-          !state.creds.registered
+          !state.creds.registered &&
+          !pairingRequested &&
+          !pairingInProgress &&
+          !pairingTimer
         ) {
-          console.log(
-            "🔐 WhatsApp a initialisé le canal de connexion."
-          );
+          /*
+           * On NE montre PAS le QR.
+           *
+           * Le QR sert uniquement de signal interne :
+           * le socket a maintenant suffisamment initialisé
+           * son canal pour demander le pairing code.
+           */
+
+          pairingTimer =
+            setTimeout(
+              async () => {
+                pairingTimer =
+                  null;
+
+                if (
+                  newSocket !== sock ||
+                  generation !== botGeneration
+                ) {
+                  return;
+                }
+
+                if (
+                  state.creds.registered
+                ) {
+                  return;
+                }
+
+                if (
+                  pairingRequested ||
+                  pairingInProgress
+                ) {
+                  return;
+                }
+
+                await requestPairingCode(
+                  state,
+                  generation,
+                  newSocket
+                );
+              },
+              800
+            );
+
+          return;
         }
 
         // =====================
@@ -3630,7 +3628,7 @@ async function startBot() {
               );
 
               console.log(
-                "➡️ Supprime l'ancienne session AUTH uniquement si WhatsApp te demande de refaire la liaison."
+                "➡️ Supprime l'ancienne session uniquement si nécessaire."
               );
 
               console.log("");
@@ -3639,15 +3637,11 @@ async function startBot() {
             }
 
             /*
-             * Important :
-             *
-             * Pendant un premier pairing, 401/LoggedOut
-             * signifie que WhatsApp a rejeté la liaison.
-             *
-             * On ne supprime PAS AUTH_DIR automatiquement.
+             * Premier pairing :
+             * on NE supprime PAS les fichiers auth.
              */
             console.log(
-              "⚠️ Fermeture pendant le premier pairing."
+              "⚠️ WhatsApp a fermé le premier pairing."
             );
 
             pairingRequested =
@@ -3659,15 +3653,18 @@ async function startBot() {
             pairingSession =
               false;
 
-            scheduleReconnect(
-              10000
-            );
-
+            /*
+             * IMPORTANT :
+             *
+             * Pas de boucle agressive après 401.
+             * Une succession de nouveaux sockets peut
+             * empirer le refus côté WhatsApp.
+             */
             return;
           }
 
           // ===================
-          // 401 / PAIRING NEUF
+          // 401 PREMIER PAIRING
           // ===================
 
           if (
@@ -3681,15 +3678,15 @@ async function startBot() {
             );
 
             console.log(
-              "❌ WhatsApp a fermé le socket après génération du code."
+              "❌ WhatsApp a fermé le socket après la demande du code."
             );
 
             console.log(
-              "⚠️ Le code affiché n'est donc plus utilisable."
+              "⚠️ Le code de ce socket est désormais invalide."
             );
 
             console.log(
-              "🔄 Nouvelle session de pairing en préparation..."
+              "🛑 Arrêt de la boucle automatique pour éviter les demandes répétées."
             );
 
             console.log("");
@@ -3704,12 +3701,12 @@ async function startBot() {
               false;
 
             /*
-             * On ne supprime jamais AUTH_DIR ici.
+             * PAS DE RECONNECT AUTOMATIQUE ICI.
+             *
+             * Si WhatsApp rejette réellement le canal de
+             * pairing, recréer immédiatement des sockets
+             * ne force pas WhatsApp à accepter le code.
              */
-            scheduleReconnect(
-              10000
-            );
-
             return;
           }
 
@@ -3762,7 +3759,7 @@ async function startBot() {
             );
 
             console.log(
-              "🔄 Nouvelle tentative automatique."
+              "🔄 Nouvelle tentative."
             );
 
             console.log("");
@@ -3936,15 +3933,6 @@ async function startBot() {
       "group-participants.update",
       handleParticipants
     );
-
-    /*
-     * IMPORTANT :
-     *
-     * Aucun requestPairingCode() ici.
-     *
-     * Le pairing est déclenché uniquement depuis
-     * connection.update → connecting.
-     */
 
     if (
       state.creds.registered
