@@ -1,6 +1,8 @@
+// ============================================================
 // NICOLAS ULTRA XMD
 // Version 3.0.0
 // Single-file WhatsApp Bot
+// ============================================================
 
 require("dotenv").config();
 
@@ -44,6 +46,7 @@ const OWNER_TELEGRAM = "@Sage_ou_Nicolas";
 
 const OFFICIAL_IMAGES = {
   menu: "https://k.top4top.io/p_3908er0dq1.jpg",
+
   extra: [
     "https://d.top4top.io/p_3908obklo1.jpg",
     "https://g.top4top.io/p_3908zypj21.jpg",
@@ -51,10 +54,18 @@ const OFFICIAL_IMAGES = {
     "https://g.top4top.io/p_39084ldec1.jpg",
     "https://l.top4top.io/p_3908v7w381.jpgr"
   ],
-  welcome: "https://j.top4top.io/p_3908uvx8h1.jpg",
-  goodbye: "https://a.top4top.io/p_3908mjw7j1.jpg",
-  ping: "https://f.top4top.io/p_3908b1cay1.jpg",
-  alive: "https://k.top4top.io/p_3908fwts41.jpg"
+
+  welcome:
+    "https://j.top4top.io/p_3908uvx8h1.jpg",
+
+  goodbye:
+    "https://a.top4top.io/p_3908mjw7j1.jpg",
+
+  ping:
+    "https://f.top4top.io/p_3908b1cay1.jpg",
+
+  alive:
+    "https://k.top4top.io/p_3908fwts41.jpg"
 };
 
 const MENU_MUSIC = path.join(
@@ -96,14 +107,17 @@ const files = {
     DATA_DIR,
     "theme.json"
   ),
+
   sudo: path.join(
     DATA_DIR,
     "sudo.json"
   ),
+
   afk: path.join(
     DATA_DIR,
     "afk.json"
   ),
+
   protections: path.join(
     DATA_DIR,
     "protections.json"
@@ -166,10 +180,12 @@ function writeJSON(file, data) {
 // ===============================
 
 let sock = null;
+
 let reconnectTimer = null;
+
 let starting = false;
+
 let pairingRequested = false;
-let pairingTimeout = null;
 
 // ===============================
 // HELPERS
@@ -216,8 +232,9 @@ function getSenderJid(message) {
 }
 
 function isOwner(jid) {
-  if (!OWNER_NUMBER)
+  if (!OWNER_NUMBER) {
     return false;
+  }
 
   return (
     normalizeNumber(
@@ -257,7 +274,9 @@ function getText(message) {
   const m =
     message?.message;
 
-  if (!m) return "";
+  if (!m) {
+    return "";
+  }
 
   return (
     m.conversation ||
@@ -339,14 +358,19 @@ function getCurrentTheme(
 
   return {
     name,
+
     menu:
       OFFICIAL_IMAGES.menu,
+
     alive:
       OFFICIAL_IMAGES.alive,
+
     ping:
       OFFICIAL_IMAGES.ping,
+
     welcome:
       OFFICIAL_IMAGES.welcome,
+
     goodbye:
       OFFICIAL_IMAGES.goodbye
   };
@@ -428,8 +452,9 @@ function isAdmin(
 function isBotAdmin(
   metadata
 ) {
-  if (!sock?.user?.id)
+  if (!sock?.user?.id) {
     return false;
+  }
 
   const botNumber =
     normalizeNumber(
@@ -481,14 +506,19 @@ function getTargetJid(
 const FANCY_STYLES = [
   text =>
     `𝑵𝑰𝑪𝑶𝑳𝑨𝑺 𝑼𝑳𝑻𝑹𝑨 𝑿𝑴𝑫`,
+
   text =>
     `𝓝𝓘𝓒𝓞𝓛𝓐𝓢 𝓤𝓛𝓣𝓡𝓐 𝓧𝓜𝓓`,
+
   text =>
     `𝗡𝗜𝗖𝗢𝗟𝗔𝗦 𝗨𝗟𝗧𝗥𝗔 𝗫𝗠𝗗`,
+
   text =>
     `𝙉𝙄𝘾𝙊𝙇𝘼𝙎 𝙐𝙇𝙏𝙍𝘼 𝙓𝙈𝘿`,
+
   text =>
     `ＮＩＣＯＬＡＳ ＵＬＴＲＡ ＸＭＤ`,
+
   text =>
     `Nɪᴄᴏʟᴀs Uʟᴛʀᴀ XMD`
 ];
@@ -672,51 +702,57 @@ function menuText() {
   ) {
     if (
       general.includes(cmd)
-    )
+    ) {
       groups.GENERAL.push([
         cmd,
         desc
       ]);
+    }
 
     else if (
       owner.includes(cmd)
-    )
+    ) {
       groups.OWNER.push([
         cmd,
         desc
       ]);
+    }
 
     else if (
       group.includes(cmd)
-    )
+    ) {
       groups.GROUP.push([
         cmd,
         desc
       ]);
+    }
 
     else if (
       protection.includes(cmd)
-    )
+    ) {
       groups.PROTECTION.push([
         cmd,
         desc
       ]);
+    }
 
     else if (
       media.includes(cmd)
-    )
+    ) {
       groups.MEDIA.push([
         cmd,
         desc
       ]);
+    }
 
     else if (
       fun.includes(cmd)
-    )
+    ) {
       groups.FUN.push([
         cmd,
         desc
       ]);
+    }
   }
 
   for (
@@ -766,8 +802,9 @@ function parseCommand(text) {
       .slice(PREFIX.length)
       .trim();
 
-  if (!body)
+  if (!body) {
     return null;
+  }
 
   const parts =
     body.split(/\s+/);
@@ -1042,44 +1079,49 @@ function getMediaMessage(
   const m =
     message?.message;
 
-  if (!m)
+  if (!m) {
     return null;
+  }
 
   if (
     m.imageMessage
-  )
+  ) {
     return {
       type: "image",
       message:
         m.imageMessage
     };
+  }
 
   if (
     m.videoMessage
-  )
+  ) {
     return {
       type: "video",
       message:
         m.videoMessage
     };
+  }
 
   if (
     m.audioMessage
-  )
+  ) {
     return {
       type: "audio",
       message:
         m.audioMessage
     };
+  }
 
   if (
     m.stickerMessage
-  )
+  ) {
     return {
       type: "sticker",
       message:
         m.stickerMessage
     };
+  }
 
   return null;
 }
@@ -2882,23 +2924,25 @@ async function handleParticipants(
   }
 }
 
-// ===============================
-// PAIRING
-// ===============================
+// ============================================================
+// PAIRING CORRIGÉ
+// ============================================================
 
 async function requestPairingCode(
   state
 ) {
+  // Session déjà enregistrée
   if (
     state.creds.registered
   ) {
     console.log(
-      "✅ Session WhatsApp déjà enregistrée."
+      "🔐 Session WhatsApp déjà enregistrée."
     );
 
     return;
   }
 
+  // Évite plusieurs demandes simultanées
   if (
     pairingRequested
   ) {
@@ -2912,13 +2956,14 @@ async function requestPairingCode(
     );
 
   if (!pairingNumber) {
+    console.error("");
     console.error(
       "❌ PAIRING_NUMBER est absent de Railway."
     );
-
     console.error(
-      "👉 Ajoute : PAIRING_NUMBER=ton_numero"
+      "👉 Variable attendue : PAIRING_NUMBER"
     );
+    console.error("");
 
     return;
   }
@@ -2926,8 +2971,18 @@ async function requestPairingCode(
   if (
     pairingNumber.length < 8
   ) {
+    console.error("");
     console.error(
       "❌ PAIRING_NUMBER semble invalide."
+    );
+    console.error("");
+
+    return;
+  }
+
+  if (!sock) {
+    console.error(
+      "❌ Socket WhatsApp indisponible."
     );
 
     return;
@@ -2936,15 +2991,15 @@ async function requestPairingCode(
   pairingRequested = true;
 
   try {
+    console.log("");
     console.log(
       "⏳ Préparation du pairing..."
     );
 
-    await sleep(3000);
+    // On laisse le socket s'initialiser
+    await sleep(5000);
 
-    if (
-      !sock
-    ) {
+    if (!sock) {
       pairingRequested =
         false;
 
@@ -2961,33 +3016,38 @@ async function requestPairingCode(
       "╔══════════════════════════════════════╗"
     );
     console.log(
-      "║      🔐 NICOLAS ULTRA XMD           ║"
+      "║       🔐 NICOLAS ULTRA XMD          ║"
     );
     console.log(
-      "║          PAIRING CODE               ║"
+      "║           PAIRING CODE              ║"
     );
     console.log(
       "╠══════════════════════════════════════╣"
     );
     console.log(
-      `║  CODE : ${code}`
+      `║          ${code}                  ║`
+    );
+    console.log(
+      "╠══════════════════════════════════════╣"
+    );
+    console.log(
+      "║ WhatsApp → Appareils connectés      ║"
+    );
+    console.log(
+      "║ → Connecter un appareil             ║"
+    );
+    console.log(
+      "║ → Avec un numéro de téléphone       ║"
     );
     console.log(
       "╚══════════════════════════════════════╝"
     );
     console.log("");
+
     console.log(
-      "📱 WhatsApp → Appareils connectés"
+      "📱 Entre maintenant le code dans WhatsApp."
     );
-    console.log(
-      "📱 → Connecter un appareil"
-    );
-    console.log(
-      "📱 → Connecter avec un numéro de téléphone"
-    );
-    console.log(
-      "📱 → Entre le code affiché ci-dessus."
-    );
+
     console.log("");
 
   } catch (error) {
@@ -3001,14 +3061,14 @@ async function requestPairingCode(
     );
 
     console.log(
-      "🔄 Une nouvelle tentative sera faite au prochain démarrage."
+      "⚠️ Le pairing n'a pas pu être généré."
     );
   }
 }
 
-// ===============================
-// START BOT
-// ===============================
+// ============================================================
+// START BOT CORRIGÉ
+// ============================================================
 
 async function startBot() {
   if (
@@ -3020,6 +3080,10 @@ async function startBot() {
   starting = true;
 
   try {
+    // =========================
+    // AUTH
+    // =========================
+
     const {
       state,
       saveCreds
@@ -3028,70 +3092,72 @@ async function startBot() {
         AUTH_DIR
       );
 
+    // =========================
+    // BAILEYS VERSION
+    // =========================
+
     const {
       version
     } =
       await fetchLatestBaileysVersion();
 
+    console.log("");
+    console.log(
+      `🚀 ${BOT_NAME} v${VERSION}`
+    );
+
+    console.log(
+      "🔧 Initialisation de WhatsApp..."
+    );
+
+    // =========================
+    // SOCKET
+    // =========================
+
     sock =
       makeWASocket({
         version,
+
         auth: state,
+
         logger: pino({
           level:
             "silent"
         }),
+
         printQRInTerminal:
           false,
+
         browser: [
           BOT_NAME,
           "Chrome",
           VERSION
         ],
+
         generateHighQualityLinkPreview:
           true,
+
         syncFullHistory:
           false,
+
         markOnlineOnConnect:
           false
       });
+
+    // =========================
+    // SAVE CREDENTIALS
+    // =========================
 
     sock.ev.on(
       "creds.update",
       saveCreds
     );
 
-    // 🔐 PAIRING AU DÉMARRAGE
-    await requestPairingCode(
-      state
-    );
-
-    sock.ev.on(
-      "messages.upsert",
-      async ({
-        messages,
-        type
-      }) => {
-        if (
-          type !== "notify"
-        )
-          return;
-
-        for (
-          const message
-          of messages
-        ) {
-          await handleMessage(
-            message
-          );
-        }
-      }
-    );
-
-    sock.ev.on(
-      "group-participants.update",
-      handleParticipants
-    );
+    // ========================================================
+    // CONNECTION UPDATE
+    // IMPORTANT :
+    // On installe connection.update AVANT le pairing.
+    // ========================================================
 
     sock.ev.on(
       "connection.update",
@@ -3100,6 +3166,10 @@ async function startBot() {
           connection,
           lastDisconnect
         } = update;
+
+        // =====================
+        // CONNECTÉ
+        // =====================
 
         if (
           connection ===
@@ -3110,31 +3180,21 @@ async function startBot() {
             "╔══════════════════════════════════════╗"
           );
           console.log(
-            `║     🟢 ${BOT_NAME} CONNECTÉ`
+            "║     🟢 NICOLAS ULTRA XMD CONNECTÉ  ║"
           );
           console.log(
-            `║             v${VERSION}`
+            `║              v${VERSION}              ║`
           );
           console.log(
             "╚══════════════════════════════════════╝"
           );
           console.log("");
 
-          starting = false;
+          starting =
+            false;
 
           pairingRequested =
             false;
-
-          if (
-            pairingTimeout
-          ) {
-            clearTimeout(
-              pairingTimeout
-            );
-
-            pairingTimeout =
-              null;
-          }
 
           if (
             reconnectTimer
@@ -3150,6 +3210,10 @@ async function startBot() {
           return;
         }
 
+        // =====================
+        // FERMÉ
+        // =====================
+
         if (
           connection ===
           "close"
@@ -3163,24 +3227,55 @@ async function startBot() {
               ?.output
               ?.statusCode;
 
+          const errorMessage =
+            lastDisconnect
+              ?.error
+              ?.message ||
+            "";
+
+          console.log("");
+
           console.log(
-            `❌ Connexion fermée : ${statusCode || "inconnu"}`
+            `❌ Connexion fermée : ${
+              statusCode ||
+              "inconnu"
+            }`
           );
+
+          if (
+            errorMessage
+          ) {
+            console.log(
+              `⚠️ ${errorMessage}`
+            );
+          }
+
+          // ===================
+          // LOGGED OUT
+          // ===================
 
           if (
             statusCode ===
             DisconnectReason.loggedOut
           ) {
+            console.log("");
+
             console.log(
-              "🔴 Session déconnectée."
+              "🔴 SESSION WHATSAPP INVALIDÉE."
             );
 
             console.log(
-              "🧹 Supprime la session AUTH puis relance le bot pour refaire le pairing."
+              "🧹 Supprime l'ancienne session AUTH puis relance Railway."
             );
+
+            console.log("");
 
             return;
           }
+
+          // ===================
+          // RECONNEXION
+          // ===================
 
           if (
             reconnectTimer
@@ -3196,6 +3291,12 @@ async function startBot() {
                 pairingRequested =
                   false;
 
+                console.log("");
+                console.log(
+                  "🔄 Nouvelle tentative de connexion..."
+                );
+                console.log("");
+
                 startBot();
               },
               5000
@@ -3204,14 +3305,79 @@ async function startBot() {
       }
     );
 
+    // =========================
+    // MESSAGES
+    // =========================
+
+    sock.ev.on(
+      "messages.upsert",
+      async ({
+        messages,
+        type
+      }) => {
+        if (
+          type !== "notify"
+        ) {
+          return;
+        }
+
+        for (
+          const message
+          of messages
+        ) {
+          await handleMessage(
+            message
+          );
+        }
+      }
+    );
+
+    // =========================
+    // GROUP PARTICIPANTS
+    // =========================
+
+    sock.ev.on(
+      "group-participants.update",
+      handleParticipants
+    );
+
+    // =========================
+    // PAIRING
+    // =========================
+
+    if (
+      !state.creds.registered
+    ) {
+      console.log(
+        "🔐 Aucune session WhatsApp trouvée."
+      );
+
+      // Les listeners sont déjà installés
+      await sleep(2000);
+
+      await requestPairingCode(
+        state
+      );
+
+    } else {
+      console.log(
+        "🔐 Session WhatsApp existante détectée."
+      );
+    }
+
   } catch (error) {
     starting =
       false;
 
+    console.error("");
+
     console.error(
-      "START ERROR:",
+      "❌ START ERROR :",
+      error?.message ||
       error
     );
+
+    console.error("");
 
     if (
       reconnectTimer
@@ -3262,14 +3428,24 @@ process.on(
 // START
 // ===============================
 
+console.log("");
 console.log(
   `🚀 ${BOT_NAME} v${VERSION}`
 );
+console.log("");
 
-if (!process.env.PAIRING_NUMBER) {
+if (
+  !process.env.PAIRING_NUMBER
+) {
   console.error(
     "⚠️ PAIRING_NUMBER n'est pas défini dans Railway."
   );
+} else {
+  console.log(
+    "📱 PAIRING_NUMBER détecté."
+  );
 }
+
+console.log("");
 
 startBot();
