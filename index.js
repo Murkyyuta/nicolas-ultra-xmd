@@ -10,7 +10,8 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
+  Browsers,
   downloadContentFromMessage
 } = require("@whiskeysockets/baileys");
 
@@ -186,15 +187,11 @@ function writeJSON(file, data) {
 // ===============================
 
 let sock = null;
-
 let reconnectTimer = null;
-
 let starting = false;
 
 let pairingRequested = false;
-
 let pairingInProgress = false;
-
 let pairingSession = false;
 
 let botGeneration = 0;
@@ -2936,7 +2933,8 @@ async function handleParticipants(
 
 async function requestPairingCode(
   state,
-  generation
+  generation,
+  currentSocket
 ) {
   if (
     state.creds.registered
@@ -2990,7 +2988,10 @@ async function requestPairingCode(
     return;
   }
 
-  if (!sock) {
+  if (
+    !currentSocket ||
+    currentSocket !== sock
+  ) {
     console.error(
       "❌ Socket WhatsApp indisponible."
     );
@@ -3019,23 +3020,19 @@ async function requestPairingCode(
       "⏳ Préparation du pairing..."
     );
 
-    // Laisse WhatsApp initialiser complètement
-    await sleep(3500);
+    /*
+     * On attend un peu que le handshake initial
+     * soit correctement établi.
+     */
+    await sleep(3000);
 
     if (
-      generation !== botGeneration
+      generation !== botGeneration ||
+      currentSocket !== sock
     ) {
       return;
     }
 
-    if (!sock) {
-      throw new Error(
-        "Socket WhatsApp indisponible"
-      );
-    }
-
-    // Si la session vient d'être enregistrée entre-temps,
-    // inutile de demander un nouveau code.
     if (
       state.creds.registered
     ) {
@@ -3046,16 +3043,15 @@ async function requestPairingCode(
       return;
     }
 
-    const currentSocket =
-      sock;
+    console.log(
+      "📱 Demande du code de pairing..."
+    );
 
     const code =
       await currentSocket.requestPairingCode(
         pairingNumber
       );
 
-    // Ne jamais afficher un ancien code provenant
-    // d'un socket qui n'est plus actif.
     if (
       currentSocket !== sock ||
       generation !== botGeneration
@@ -3078,6 +3074,14 @@ async function requestPairingCode(
       );
     }
 
+    /*
+     * Format visuel XXXX-XXXX.
+     */
+    const displayCode =
+      cleanCode.length === 8
+        ? `${cleanCode.slice(0, 4)}-${cleanCode.slice(4)}`
+        : cleanCode;
+
     console.log("");
     console.log(
       "╔══════════════════════════════════════╗"
@@ -3092,7 +3096,7 @@ async function requestPairingCode(
       "╠══════════════════════════════════════╣"
     );
     console.log(
-      `║          ${cleanCode}                  ║`
+      `║             ${displayCode}             ║`
     );
     console.log(
       "╠══════════════════════════════════════╣"
@@ -3132,16 +3136,16 @@ async function requestPairingCode(
       message
     );
 
-    // IMPORTANT :
-    // Ne pas supprimer l'auth ici.
-    // Un 401/Connection Closed pendant un pairing neuf
-    // peut arriver avant la fin du processus.
     console.log(
       "⚠️ La connexion de pairing a été interrompue."
     );
 
+    /*
+     * IMPORTANT :
+     * On ne supprime jamais AUTH_DIR ici.
+     */
     if (
-      /401|connection closed|connection failure/i.test(
+      /401|428|405|connection closed|connection failure|bad-request/i.test(
         message
       )
     ) {
@@ -3227,13 +3231,44 @@ async function startBot() {
       );
 
     // =========================
-    // VERSION
+    // VERSION WHATSAPP WEB
     // =========================
 
-    const {
-      version
-    } =
-      await fetchLatestBaileysVersion();
+    let version;
+
+    try {
+      const waVersion =
+        await fetchLatestWaWebVersion();
+
+      version =
+        waVersion.version;
+
+      console.log("");
+      console.log(
+        `🌐 WhatsApp Web : ${version.join(".")}`
+      );
+
+      console.log(
+        `✅ Version actuelle : ${
+          waVersion.isLatest
+            ? "oui"
+            : "non"
+        }`);
+
+    } catch (versionError) {
+      console.error(
+        "⚠️ Impossible de récupérer la version WhatsApp Web :",
+        versionError?.message ||
+        versionError
+      );
+
+      /*
+       * On laisse Baileys utiliser sa version interne
+       * plutôt que de casser complètement le démarrage.
+       */
+      version =
+        undefined;
+    }
 
     console.log("");
     console.log(
@@ -3260,44 +3295,55 @@ async function startBot() {
     // SOCKET
     // =========================
 
+    const socketOptions = {
+      auth: state,
+
+      logger: pino({
+        level:
+          "silent"
+      }),
+
+      printQRInTerminal:
+        false,
+
+      /*
+       * IMPORTANT :
+       * navigateur canonique pour éviter
+       * certains codes de pairing morts.
+       */
+      browser:
+        Browsers.macOS(
+          "Desktop"
+        ),
+
+      generateHighQualityLinkPreview:
+        true,
+
+      syncFullHistory:
+        false,
+
+      markOnlineOnConnect:
+        false,
+
+      connectTimeoutMs:
+        60000,
+
+      defaultQueryTimeoutMs:
+        60000,
+
+      keepAliveIntervalMs:
+        30000
+    };
+
+    if (version) {
+      socketOptions.version =
+        version;
+    }
+
     const newSocket =
-      makeWASocket({
-        version,
-
-        auth: state,
-
-        logger: pino({
-          level:
-            "silent"
-        }),
-
-        printQRInTerminal:
-          false,
-
-        browser: [
-          BOT_NAME,
-          "Chrome",
-          VERSION
-        ],
-
-        generateHighQualityLinkPreview:
-          true,
-
-        syncFullHistory:
-          false,
-
-        markOnlineOnConnect:
-          false,
-
-        connectTimeoutMs:
-          60000,
-
-        defaultQueryTimeoutMs:
-          60000,
-
-        keepAliveIntervalMs:
-          30000
-      });
+      makeWASocket(
+        socketOptions
+      );
 
     sock =
       newSocket;
@@ -3464,21 +3510,16 @@ async function startBot() {
               );
 
               console.log("");
+
               return;
             }
 
-            // Cas important :
-            // 401 pendant un premier pairing.
+            /*
+             * Si aucun compte n'était enregistré,
+             * on ne détruit rien et on retente.
+             */
             console.log(
-              "⚠️ 401 pendant le premier pairing."
-            );
-
-            console.log(
-              "🔄 Ce n'est pas traité comme une session déjà enregistrée."
-            );
-
-            console.log(
-              "🔄 Nouvelle tentative de pairing..."
+              "⚠️ Fermeture pendant le premier pairing."
             );
 
             pairingRequested =
@@ -3516,7 +3557,42 @@ async function startBot() {
             );
 
             console.log(
-              "🔄 Nouvelle tentative automatique dans quelques secondes."
+              "🔄 Nouvelle tentative automatique."
+            );
+
+            console.log("");
+
+            pairingRequested =
+              false;
+
+            pairingInProgress =
+              false;
+
+            pairingSession =
+              false;
+
+            scheduleReconnect(
+              7000
+            );
+
+            return;
+          }
+
+          // ===================
+          // 428
+          // ===================
+
+          if (
+            statusCode ===
+            428
+          ) {
+            console.log("");
+            console.log(
+              "⚠️ WhatsApp a fermé la connexion avec 428."
+            );
+
+            console.log(
+              "🔄 Nouvelle tentative automatique."
             );
             console.log("");
 
@@ -3531,6 +3607,41 @@ async function startBot() {
 
             scheduleReconnect(
               7000
+            );
+
+            return;
+          }
+
+          // ===================
+          // 405
+          // ===================
+
+          if (
+            statusCode ===
+            405
+          ) {
+            console.log("");
+            console.log(
+              "⚠️ WhatsApp a refusé la version/client."
+            );
+
+            console.log(
+              "🌐 Une nouvelle version WhatsApp Web sera récupérée au prochain démarrage."
+            );
+
+            console.log("");
+
+            pairingRequested =
+              false;
+
+            pairingInProgress =
+              false;
+
+            pairingSession =
+              false;
+
+            scheduleReconnect(
+              8000
             );
 
             return;
@@ -3627,6 +3738,10 @@ async function startBot() {
     if (
       !state.creds.registered
     ) {
+      /*
+       * Petit délai initial.
+       * Le code est demandé sur CE socket uniquement.
+       */
       await sleep(1500);
 
       if (
@@ -3638,7 +3753,8 @@ async function startBot() {
 
       await requestPairingCode(
         state,
-        generation
+        generation,
+        newSocket
       );
 
     } else {
