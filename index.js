@@ -29,8 +29,17 @@ const AUTH_DIR =
   "/app/auth_info_baileys";
 
 const OWNER_NAME = "Nicolas";
-const OWNER_NUMBER = "242067904938";
-const OWNER_JID = `${OWNER_NUMBER}@s.whatsapp.net`;
+
+const OWNER_NUMBER = normalizeNumber(
+  process.env.OWNER_NUMBER ||
+  process.env.PAIRING_NUMBER ||
+  ""
+);
+
+const OWNER_JID = OWNER_NUMBER
+  ? `${OWNER_NUMBER}@s.whatsapp.net`
+  : "";
+
 const OWNER_TELEGRAM = "@Sage_ou_Nicolas";
 
 const OFFICIAL_IMAGES = {
@@ -71,24 +80,45 @@ const THEMES = [
 // DATA
 // ===============================
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = path.join(
+  process.cwd(),
+  "data"
+);
 
 if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(DATA_DIR, {
+    recursive: true
+  });
 }
 
 const files = {
-  theme: path.join(DATA_DIR, "theme.json"),
-  sudo: path.join(DATA_DIR, "sudo.json"),
-  afk: path.join(DATA_DIR, "afk.json"),
-  protections: path.join(DATA_DIR, "protections.json")
+  theme: path.join(
+    DATA_DIR,
+    "theme.json"
+  ),
+  sudo: path.join(
+    DATA_DIR,
+    "sudo.json"
+  ),
+  afk: path.join(
+    DATA_DIR,
+    "afk.json"
+  ),
+  protections: path.join(
+    DATA_DIR,
+    "protections.json"
+  )
 };
 
 function ensureJSON(file, fallback) {
   if (!fs.existsSync(file)) {
     fs.writeFileSync(
       file,
-      JSON.stringify(fallback, null, 2)
+      JSON.stringify(
+        fallback,
+        null,
+        2
+      )
     );
   }
 }
@@ -102,11 +132,19 @@ ensureJSON(files.sudo, []);
 
 ensureJSON(files.afk, {});
 
-ensureJSON(files.protections, {});
+ensureJSON(
+  files.protections,
+  {}
+);
 
 function readJSON(file, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return JSON.parse(
+      fs.readFileSync(
+        file,
+        "utf8"
+      )
+    );
   } catch {
     return fallback;
   }
@@ -115,7 +153,11 @@ function readJSON(file, fallback) {
 function writeJSON(file, data) {
   fs.writeFileSync(
     file,
-    JSON.stringify(data, null, 2)
+    JSON.stringify(
+      data,
+      null,
+      2
+    )
   );
 }
 
@@ -134,11 +176,16 @@ let pairingTimeout = null;
 // ===============================
 
 const sleep = ms =>
-  new Promise(resolve => setTimeout(resolve, ms));
+  new Promise(resolve =>
+    setTimeout(resolve, ms)
+  );
 
 function randomItem(array) {
   return array[
-    Math.floor(Math.random() * array.length)
+    Math.floor(
+      Math.random() *
+      array.length
+    )
   ];
 }
 
@@ -150,7 +197,7 @@ function jidToNumber(jid = "") {
 }
 
 function normalizeNumber(number = "") {
-  return number
+  return String(number)
     .replace(/\D/g, "")
     .replace(/^00/, "");
 }
@@ -169,32 +216,46 @@ function getSenderJid(message) {
 }
 
 function isOwner(jid) {
+  if (!OWNER_NUMBER)
+    return false;
+
   return (
-    normalizeNumber(jidToNumber(jid)) ===
-    normalizeNumber(OWNER_NUMBER)
+    normalizeNumber(
+      jidToNumber(jid)
+    ) === OWNER_NUMBER
   );
 }
 
 function getSudo() {
-  return readJSON(files.sudo, []);
+  return readJSON(
+    files.sudo,
+    []
+  );
 }
 
 function isSudo(jid) {
-  const number = normalizeNumber(
-    jidToNumber(jid)
-  );
+  const number =
+    normalizeNumber(
+      jidToNumber(jid)
+    );
 
   return getSudo().some(
-    x => normalizeNumber(x) === number
+    x =>
+      normalizeNumber(x) ===
+      number
   );
 }
 
 function hasOwnerAccess(jid) {
-  return isOwner(jid) || isSudo(jid);
+  return (
+    isOwner(jid) ||
+    isSudo(jid)
+  );
 }
 
 function getText(message) {
-  const m = message?.message;
+  const m =
+    message?.message;
 
   if (!m) return "";
 
@@ -208,14 +269,21 @@ function getText(message) {
   );
 }
 
-async function react(jid, key, emoji) {
+async function react(
+  jid,
+  key,
+  emoji
+) {
   try {
-    await sock.sendMessage(jid, {
-      react: {
-        text: emoji,
-        key
+    await sock.sendMessage(
+      jid,
+      {
+        react: {
+          text: emoji,
+          key
+        }
       }
-    });
+    );
   } catch {}
 }
 
@@ -226,7 +294,9 @@ async function sendText(
 ) {
   return sock.sendMessage(
     jid,
-    { text },
+    {
+      text
+    },
     options
   );
 }
@@ -240,57 +310,79 @@ async function sendImage(
   return sock.sendMessage(
     jid,
     {
-      image: { url: image },
+      image: {
+        url: image
+      },
       caption
     },
     options
   );
 }
 
-function getCurrentTheme(jid = "") {
-  const themes = readJSON(
-    files.theme,
-    {
-      global: "solo",
-      groups: {}
-    }
-  );
+function getCurrentTheme(
+  jid = ""
+) {
+  const themes =
+    readJSON(
+      files.theme,
+      {
+        global: "solo",
+        groups: {}
+      }
+    );
 
   const name =
-    isGroupJid(jid) && themes.groups[jid]
+    isGroupJid(jid) &&
+    themes.groups[jid]
       ? themes.groups[jid]
       : themes.global;
 
   return {
     name,
-    menu: OFFICIAL_IMAGES.menu,
-    alive: OFFICIAL_IMAGES.alive,
-    ping: OFFICIAL_IMAGES.ping,
-    welcome: OFFICIAL_IMAGES.welcome,
-    goodbye: OFFICIAL_IMAGES.goodbye
+    menu:
+      OFFICIAL_IMAGES.menu,
+    alive:
+      OFFICIAL_IMAGES.alive,
+    ping:
+      OFFICIAL_IMAGES.ping,
+    welcome:
+      OFFICIAL_IMAGES.welcome,
+    goodbye:
+      OFFICIAL_IMAGES.goodbye
   };
 }
 
-function setTheme(jid, theme) {
-  if (!THEMES.includes(theme)) {
+function setTheme(
+  jid,
+  theme
+) {
+  if (
+    !THEMES.includes(theme)
+  ) {
     return false;
   }
 
-  const themes = readJSON(
-    files.theme,
-    {
-      global: "solo",
-      groups: {}
-    }
-  );
+  const themes =
+    readJSON(
+      files.theme,
+      {
+        global: "solo",
+        groups: {}
+      }
+    );
 
   if (isGroupJid(jid)) {
-    themes.groups[jid] = theme;
+    themes.groups[jid] =
+      theme;
   } else {
-    themes.global = theme;
+    themes.global =
+      theme;
   }
 
-  writeJSON(files.theme, themes);
+  writeJSON(
+    files.theme,
+    themes
+  );
 
   return true;
 }
@@ -299,55 +391,83 @@ function setTheme(jid, theme) {
 // GROUP
 // ===============================
 
-async function getGroupMetadata(jid) {
-  return sock.groupMetadata(jid);
+async function getGroupMetadata(
+  jid
+) {
+  return sock.groupMetadata(
+    jid
+  );
 }
 
-function getGroupAdmins(metadata) {
+function getGroupAdmins(
+  metadata
+) {
   return metadata.participants
     .filter(p => p.admin)
     .map(p => p.id);
 }
 
-function isAdmin(metadata, jid) {
-  const number = normalizeNumber(
-    jidToNumber(jid)
-  );
+function isAdmin(
+  metadata,
+  jid
+) {
+  const number =
+    normalizeNumber(
+      jidToNumber(jid)
+    );
 
   return metadata.participants.some(
     p =>
-      normalizeNumber(jidToNumber(p.id)) === number &&
+      normalizeNumber(
+        jidToNumber(p.id)
+      ) === number &&
       !!p.admin
   );
 }
 
-function isBotAdmin(metadata) {
-  if (!sock?.user?.id) return false;
+function isBotAdmin(
+  metadata
+) {
+  if (!sock?.user?.id)
+    return false;
 
-  const botNumber = normalizeNumber(
-    jidToNumber(sock.user.id)
-  );
+  const botNumber =
+    normalizeNumber(
+      jidToNumber(
+        sock.user.id
+      )
+    );
 
   return metadata.participants.some(
     p =>
-      normalizeNumber(jidToNumber(p.id)) === botNumber &&
+      normalizeNumber(
+        jidToNumber(p.id)
+      ) === botNumber &&
       !!p.admin
   );
 }
 
-function getTargetJid(message) {
+function getTargetJid(
+  message
+) {
   const context =
-    message?.message?.extendedTextMessage
+    message?.message
+      ?.extendedTextMessage
       ?.contextInfo;
 
   const mentioned =
-    context?.mentionedJid || [];
+    context?.mentionedJid ||
+    [];
 
-  if (mentioned.length) {
+  if (
+    mentioned.length
+  ) {
     return mentioned[0];
   }
 
-  if (context?.participant) {
+  if (
+    context?.participant
+  ) {
     return context.participant;
   }
 
@@ -359,18 +479,28 @@ function getTargetJid(message) {
 // ===============================
 
 const FANCY_STYLES = [
-  text => `𝑵𝑰𝑪𝑶𝑳𝑨𝑺 𝑼𝑳𝑻𝑹𝑨 𝑿𝑴𝑫`,
-  text => `𝓝𝓘𝓒𝓞𝓛𝓐𝓢 𝓤𝓛𝓣𝓡𝓐 𝓧𝓜𝓓`,
-  text => `𝗡𝗜𝗖𝗢𝗟𝗔𝗦 𝗨𝗟𝗧𝗥𝗔 𝗫𝗠𝗗`,
-  text => `𝙉𝙄𝘾𝙊𝙇𝘼𝙎 𝙐𝙇𝙏𝙍𝘼 𝙓𝙈𝘿`,
-  text => `ＮＩＣＯＬＡＳ ＵＬＴＲＡ ＸＭＤ`,
-  text => `Nɪᴄᴏʟᴀs Uʟᴛʀᴀ XMD`
+  text =>
+    `𝑵𝑰𝑪𝑶𝑳𝑨𝑺 𝑼𝑳𝑻𝑹𝑨 𝑿𝑴𝑫`,
+  text =>
+    `𝓝𝓘𝓒𝓞𝓛𝓐𝓢 𝓤𝓛𝓣𝓡𝓐 𝓧𝓜𝓓`,
+  text =>
+    `𝗡𝗜𝗖𝗢𝗟𝗔𝗦 𝗨𝗟𝗧𝗥𝗔 𝗫𝗠𝗗`,
+  text =>
+    `𝙉𝙄𝘾𝙊𝙇𝘼𝙎 𝙐𝙇𝙏𝙍𝘼 𝙓𝙈𝘿`,
+  text =>
+    `ＮＩＣＯＬＡＳ ＵＬＴＲＡ ＸＭＤ`,
+  text =>
+    `Nɪᴄᴏʟᴀs Uʟᴛʀᴀ XMD`
 ];
 
-function fancy(text, style = 0) {
+function fancy(
+  text,
+  style = 0
+) {
   const fn =
     FANCY_STYLES[
-      style % FANCY_STYLES.length
+      style %
+      FANCY_STYLES.length
     ];
 
   return fn(text);
@@ -434,21 +564,38 @@ const COMMANDS = [
 function menuText() {
   const style =
     Math.floor(
-      Math.random() * FANCY_STYLES.length
+      Math.random() *
+      FANCY_STYLES.length
     );
 
-  const title = fancy(
-    BOT_NAME,
-    style
-  );
+  const title =
+    fancy(
+      BOT_NAME,
+      style
+    );
 
   const lines = [];
 
-  lines.push(`╭━━━〔 ${title} 〕━━━╮`);
-  lines.push(`┃ 👑 Owner : ${OWNER_NAME}`);
-  lines.push(`┃ ⚡ Version : ${VERSION}`);
-  lines.push(`┃ 🔰 Prefix : ${PREFIX}`);
-  lines.push(`╰━━━━━━━━━━━━━━━━╯`);
+  lines.push(
+    `╭━━━〔 ${title} 〕━━━╮`
+  );
+
+  lines.push(
+    `┃ 👑 Owner : ${OWNER_NAME}`
+  );
+
+  lines.push(
+    `┃ ⚡ Version : ${VERSION}`
+  );
+
+  lines.push(
+    `┃ 🔰 Prefix : ${PREFIX}`
+  );
+
+  lines.push(
+    `╰━━━━━━━━━━━━━━━━╯`
+  );
+
   lines.push("");
 
   const groups = {
@@ -519,34 +666,80 @@ function menuText() {
     "theme"
   ];
 
-  for (const [cmd, desc] of COMMANDS) {
-    if (general.includes(cmd))
-      groups.GENERAL.push([cmd, desc]);
+  for (
+    const [cmd, desc]
+    of COMMANDS
+  ) {
+    if (
+      general.includes(cmd)
+    )
+      groups.GENERAL.push([
+        cmd,
+        desc
+      ]);
 
-    else if (owner.includes(cmd))
-      groups.OWNER.push([cmd, desc]);
+    else if (
+      owner.includes(cmd)
+    )
+      groups.OWNER.push([
+        cmd,
+        desc
+      ]);
 
-    else if (group.includes(cmd))
-      groups.GROUP.push([cmd, desc]);
+    else if (
+      group.includes(cmd)
+    )
+      groups.GROUP.push([
+        cmd,
+        desc
+      ]);
 
-    else if (protection.includes(cmd))
-      groups.PROTECTION.push([cmd, desc]);
+    else if (
+      protection.includes(cmd)
+    )
+      groups.PROTECTION.push([
+        cmd,
+        desc
+      ]);
 
-    else if (media.includes(cmd))
-      groups.MEDIA.push([cmd, desc]);
+    else if (
+      media.includes(cmd)
+    )
+      groups.MEDIA.push([
+        cmd,
+        desc
+      ]);
 
-    else if (fun.includes(cmd))
-      groups.FUN.push([cmd, desc]);
+    else if (
+      fun.includes(cmd)
+    )
+      groups.FUN.push([
+        cmd,
+        desc
+      ]);
   }
 
-  for (const [category, list] of Object.entries(groups)) {
-    lines.push(`╭─〔 ${category} 〕`);
+  for (
+    const [category, list]
+    of Object.entries(groups)
+  ) {
+    lines.push(
+      `╭─〔 ${category} 〕`
+    );
 
-    for (const [cmd, desc] of list) {
-      lines.push(`│ ${PREFIX}${cmd} — ${desc}`);
+    for (
+      const [cmd, desc]
+      of list
+    ) {
+      lines.push(
+        `│ ${PREFIX}${cmd} — ${desc}`
+      );
     }
 
-    lines.push(`╰────────────`);
+    lines.push(
+      `╰────────────`
+    );
+
     lines.push("");
   }
 
@@ -562,18 +755,27 @@ function menuText() {
 // ===============================
 
 function parseCommand(text) {
-  if (!text.startsWith(PREFIX)) {
+  if (
+    !text.startsWith(PREFIX)
+  ) {
     return null;
   }
 
-  const body = text.slice(PREFIX.length).trim();
+  const body =
+    text
+      .slice(PREFIX.length)
+      .trim();
 
-  if (!body) return null;
+  if (!body)
+    return null;
 
-  const parts = body.split(/\s+/);
+  const parts =
+    body.split(/\s+/);
 
   const command =
-    parts.shift().toLowerCase();
+    parts
+      .shift()
+      .toLowerCase();
 
   return {
     command,
@@ -586,34 +788,56 @@ function parseCommand(text) {
 // CONTEXT
 // ===============================
 
-function getContext(message) {
+function getContext(
+  message
+) {
   return (
     message?.message
       ?.extendedTextMessage
-      ?.contextInfo || {}
+      ?.contextInfo ||
+    {}
   );
 }
 
-function getQuoted(message) {
-  return getContext(message)
-    ?.quotedMessage || null;
+function getQuoted(
+  message
+) {
+  return getContext(
+    message
+  )?.quotedMessage ||
+    null;
 }
 
-function getMentioned(message) {
+function getMentioned(
+  message
+) {
   return (
-    getContext(message)
-      ?.mentionedJid || []
+    getContext(
+      message
+    )?.mentionedJid ||
+    []
   );
 }
 
-function formatDuration(seconds) {
-  seconds = Math.floor(seconds);
+function formatDuration(
+  seconds
+) {
+  seconds =
+    Math.floor(seconds);
 
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor(
-    (seconds % 3600) / 60
-  );
-  const s = seconds % 60;
+  const h =
+    Math.floor(
+      seconds / 3600
+    );
+
+  const m =
+    Math.floor(
+      (seconds % 3600) /
+      60
+    );
+
+  const s =
+    seconds % 60;
 
   return [
     h ? `${h}h` : "",
@@ -624,11 +848,17 @@ function formatDuration(seconds) {
     .join(" ");
 }
 
-function cleanMention(jid) {
+function cleanMention(
+  jid
+) {
   return `@${jidToNumber(jid)}`;
 }
 
-function sendMention(jid, text, mentions) {
+function sendMention(
+  jid,
+  text,
+  mentions
+) {
   return sock.sendMessage(
     jid,
     {
@@ -638,12 +868,17 @@ function sendMention(jid, text, mentions) {
   );
 }
 
-async function requireGroup(jid) {
-  if (!isGroupJid(jid)) {
+async function requireGroup(
+  jid
+) {
+  if (
+    !isGroupJid(jid)
+  ) {
     await sendText(
       jid,
       "❌ Cette commande fonctionne seulement dans un groupe."
     );
+
     return false;
   }
 
@@ -654,16 +889,23 @@ async function requireAdmin(
   jid,
   sender
 ) {
-  if (!await requireGroup(jid)) {
+  if (
+    !await requireGroup(jid)
+  ) {
     return false;
   }
 
   const metadata =
-    await getGroupMetadata(jid);
+    await getGroupMetadata(
+      jid
+    );
 
   if (
     !hasOwnerAccess(sender) &&
-    !isAdmin(metadata, sender)
+    !isAdmin(
+      metadata,
+      sender
+    )
   ) {
     await sendText(
       jid,
@@ -687,23 +929,34 @@ function getAFK() {
   );
 }
 
-function setAFK(jid, data) {
-  const afk = getAFK();
+function setAFK(
+  jid,
+  data
+) {
+  const afk =
+    getAFK();
 
-  if (data === null) {
+  if (
+    data === null
+  ) {
     delete afk[jid];
   } else {
     afk[jid] = data;
   }
 
-  writeJSON(files.afk, afk);
+  writeJSON(
+    files.afk,
+    afk
+  );
 }
 
 // ===============================
 // PROTECTION
 // ===============================
 
-function getProtection(jid) {
+function getProtection(
+  jid
+) {
   const protections =
     readJSON(
       files.protections,
@@ -713,7 +966,8 @@ function getProtection(jid) {
   return (
     protections[jid] || {
       antilink: false,
-      antilinkAction: "delete",
+      antilinkAction:
+        "delete",
       antipromote: false
     }
   );
@@ -730,15 +984,19 @@ function setProtection(
       {}
     );
 
-  if (!protections[jid]) {
+  if (
+    !protections[jid]
+  ) {
     protections[jid] = {
       antilink: false,
-      antilinkAction: "delete",
+      antilinkAction:
+        "delete",
       antipromote: false
     };
   }
 
-  protections[jid][key] = value;
+  protections[jid][key] =
+    value;
 
   writeJSON(
     files.protections,
@@ -763,43 +1021,64 @@ async function downloadMedia(
 
     const chunks = [];
 
-    for await (const chunk of stream) {
+    for await (
+      const chunk
+      of stream
+    ) {
       chunks.push(chunk);
     }
 
-    return Buffer.concat(chunks);
+    return Buffer.concat(
+      chunks
+    );
   } catch {
     return null;
   }
 }
 
-function getMediaMessage(message) {
-  const m = message?.message;
+function getMediaMessage(
+  message
+) {
+  const m =
+    message?.message;
 
-  if (!m) return null;
+  if (!m)
+    return null;
 
-  if (m.imageMessage)
+  if (
+    m.imageMessage
+  )
     return {
       type: "image",
-      message: m.imageMessage
+      message:
+        m.imageMessage
     };
 
-  if (m.videoMessage)
+  if (
+    m.videoMessage
+  )
     return {
       type: "video",
-      message: m.videoMessage
+      message:
+        m.videoMessage
     };
 
-  if (m.audioMessage)
+  if (
+    m.audioMessage
+  )
     return {
       type: "audio",
-      message: m.audioMessage
+      message:
+        m.audioMessage
     };
 
-  if (m.stickerMessage)
+  if (
+    m.stickerMessage
+  )
     return {
       type: "sticker",
-      message: m.stickerMessage
+      message:
+        m.stickerMessage
     };
 
   return null;
@@ -809,7 +1088,9 @@ function getMediaMessage(message) {
 // PINTEREST
 // ===============================
 
-async function pinterestSearch(query) {
+async function pinterestSearch(
+  query
+) {
   const url =
     `https://api.giftedtech.co.ke/api/search/pinterest?apikey=gifted&query=${encodeURIComponent(query)}`;
 
@@ -835,7 +1116,10 @@ async function pinterestSearch(query) {
     );
   }
 
-  return data.result.slice(0, 5);
+  return data.result.slice(
+    0,
+    5
+  );
 }
 
 // ===============================
@@ -855,7 +1139,9 @@ async function playYouTube(
       require("@distube/ytdl-core");
 
     const result =
-      await ytSearch(query);
+      await ytSearch(
+        query
+      );
 
     if (
       !result.videos ||
@@ -876,18 +1162,28 @@ async function playYouTube(
     );
 
     const stream =
-      ytdl(video.url, {
-        filter: "audioonly",
-        quality: "highestaudio"
-      });
+      ytdl(
+        video.url,
+        {
+          filter:
+            "audioonly",
+          quality:
+            "highestaudio"
+        }
+      );
 
     const chunks = [];
 
-    for await (const chunk of stream) {
+    for await (
+      const chunk
+      of stream
+    ) {
       chunks.push(chunk);
 
       if (
-        Buffer.concat(chunks).length >
+        Buffer.concat(
+          chunks
+        ).length >
         15 * 1024 * 1024
       ) {
         throw new Error(
@@ -897,13 +1193,16 @@ async function playYouTube(
     }
 
     const buffer =
-      Buffer.concat(chunks);
+      Buffer.concat(
+        chunks
+      );
 
     await sock.sendMessage(
       jid,
       {
         audio: buffer,
-        mimetype: "audio/mpeg",
+        mimetype:
+          "audio/mpeg",
         fileName:
           `${video.title}.mp3`
       },
@@ -949,20 +1248,19 @@ async function handleCommand(
 
   switch (command) {
 
-    // =========================
-    // GENERAL
-    // =========================
-
     case "menu": {
       const caption =
         menuText();
 
       await sendImage(
         jid,
-        getCurrentTheme(jid).menu,
+        getCurrentTheme(
+          jid
+        ).menu,
         caption,
         {
-          quoted: message
+          quoted:
+            message
         }
       );
 
@@ -985,7 +1283,8 @@ async function handleCommand(
               "NICOLAS-ULTRA-XMD-MENU.m4a"
           },
           {
-            quoted: message
+            quoted:
+              message
           }
         );
       }
@@ -996,14 +1295,17 @@ async function handleCommand(
     case "alive": {
       await sendImage(
         jid,
-        getCurrentTheme(jid).alive,
+        getCurrentTheme(
+          jid
+        ).alive,
         `╭━━〔 ${BOT_NAME} 〕━━╮\n\n` +
         `🟢 Bot en ligne\n` +
         `⚡ Version : ${VERSION}\n` +
         `👑 Owner : ${OWNER_NAME}\n\n` +
         `╰━━━━━━━━━━━━╯`,
         {
-          quoted: message
+          quoted:
+            message
         }
       );
 
@@ -1021,14 +1323,16 @@ async function handleCommand(
       );
 
       const speed =
-        Date.now() - start;
+        Date.now() -
+        start;
 
       await sendImage(
         jid,
         OFFICIAL_IMAGES.ping,
         `🏓 Pong !\n\n⚡ ${speed} ms`,
         {
-          quoted: message
+          quoted:
+            message
         }
       );
 
@@ -1042,7 +1346,8 @@ async function handleCommand(
       await sleep(20);
 
       const speed =
-        Date.now() - start;
+        Date.now() -
+        start;
 
       await sendText(
         jid,
@@ -1053,6 +1358,13 @@ async function handleCommand(
     }
 
     case "owner": {
+      if (!OWNER_NUMBER) {
+        return sendText(
+          jid,
+          "👑 Owner non configuré."
+        );
+      }
+
       await sendText(
         jid,
         `👑 Voilà le dev du bot, bg : @${OWNER_NUMBER}\n\n` +
@@ -1080,10 +1392,6 @@ async function handleCommand(
 
       return;
     }
-
-    // =========================
-    // HELP / LIST
-    // =========================
 
     case "help": {
       await sendText(
@@ -1119,12 +1427,10 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // OWNER
-    // =========================
-
     case "sudo": {
-      if (!isOwner(sender)) {
+      if (
+        !isOwner(sender)
+      ) {
         return sendText(
           jid,
           "❌ Seul Nicolas peut gérer les sudo."
@@ -1151,7 +1457,9 @@ async function handleCommand(
       }
 
       const target =
-        getTargetJid(message);
+        getTargetJid(
+          message
+        );
 
       if (
         !target &&
@@ -1165,7 +1473,9 @@ async function handleCommand(
 
       const number =
         target
-          ? jidToNumber(target)
+          ? jidToNumber(
+              target
+            )
           : normalizeNumber(
               args[1]
             );
@@ -1173,8 +1483,15 @@ async function handleCommand(
       if (
         action === "add"
       ) {
-        if (!sudo.includes(number)) {
-          sudo.push(number);
+        if (
+          !sudo.includes(
+            number
+          )
+        ) {
+          sudo.push(
+            number
+          );
+
           writeJSON(
             files.sudo,
             sudo
@@ -1195,8 +1512,12 @@ async function handleCommand(
         const filtered =
           sudo.filter(
             x =>
-              normalizeNumber(x) !==
-              normalizeNumber(number)
+              normalizeNumber(
+                x
+              ) !==
+              normalizeNumber(
+                number
+              )
           );
 
         writeJSON(
@@ -1222,7 +1543,9 @@ async function handleCommand(
 
     case "pair": {
       if (
-        !hasOwnerAccess(sender)
+        !hasOwnerAccess(
+          sender
+        )
       ) {
         return sendText(
           jid,
@@ -1232,7 +1555,7 @@ async function handleCommand(
 
       await sendText(
         jid,
-        "🔐 Le système de pairing est disponible au démarrage du bot."
+        "🔐 Le système de pairing est lancé automatiquement au démarrage du bot."
       );
 
       return;
@@ -1240,7 +1563,9 @@ async function handleCommand(
 
     case "purge": {
       if (
-        !hasOwnerAccess(sender)
+        !hasOwnerAccess(
+          sender
+        )
       ) {
         return sendText(
           jid,
@@ -1256,10 +1581,6 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // GROUP
-    // =========================
-
     case "groupinfo": {
       const metadata =
         await requireAdmin(
@@ -1267,7 +1588,8 @@ async function handleCommand(
           sender
         );
 
-      if (!metadata) return;
+      if (!metadata)
+        return;
 
       await sendText(
         jid,
@@ -1284,8 +1606,11 @@ async function handleCommand(
     case "listadmin":
     case "staff": {
       if (
-        !await requireGroup(jid)
-      ) return;
+        !await requireGroup(
+          jid
+        )
+      )
+        return;
 
       const metadata =
         await getGroupMetadata(
@@ -1296,9 +1621,6 @@ async function handleCommand(
         getGroupAdmins(
           metadata
         );
-
-      const mentions =
-        admins;
 
       const list =
         admins
@@ -1311,7 +1633,7 @@ async function handleCommand(
       await sendMention(
         jid,
         `👑 STAFF DU GROUPE\n\n${list}`,
-        mentions
+        admins
       );
 
       return;
@@ -1328,7 +1650,9 @@ async function handleCommand(
         return;
 
       const target =
-        getTargetJid(message);
+        getTargetJid(
+          message
+        );
 
       if (!target) {
         return sendText(
@@ -1339,7 +1663,9 @@ async function handleCommand(
 
       await sendMention(
         jid,
-        `👋 ${cleanMention(target)}`,
+        `👋 ${cleanMention(
+          target
+        )}`,
         [target]
       );
 
@@ -1365,8 +1691,7 @@ async function handleCommand(
           ? args.join(" ")
           : "📢 Tout le monde est appelé !";
 
-      const text =
-        `${body}\n\n` +
+      const tagText =
         mentions
           .map(
             x =>
@@ -1376,7 +1701,7 @@ async function handleCommand(
 
       await sendMention(
         jid,
-        text,
+        `${body}\n\n${tagText}`,
         mentions
       );
 
@@ -1440,7 +1765,9 @@ async function handleCommand(
         return;
 
       const target =
-        getTargetJid(message);
+        getTargetJid(
+          message
+        );
 
       if (!target) {
         return sendText(
@@ -1469,7 +1796,9 @@ async function handleCommand(
           jid,
           `🛑 ${cleanMention(target)} a été retiré.`,
           {
-            mentions: [target]
+            mentions: [
+              target
+            ]
           }
         );
       } catch {
@@ -1494,7 +1823,9 @@ async function handleCommand(
         return;
 
       const target =
-        getTargetJid(message);
+        getTargetJid(
+          message
+        );
 
       if (!target) {
         return sendText(
@@ -1507,18 +1838,22 @@ async function handleCommand(
         await sock.groupParticipantsUpdate(
           jid,
           [target],
-          command === "promote"
+          command ===
+          "promote"
             ? "promote"
             : "demote"
         );
 
         await sendText(
           jid,
-          command === "promote"
+          command ===
+          "promote"
             ? `👑 ${cleanMention(target)} est maintenant admin.`
             : `📉 ${cleanMention(target)} n'est plus admin.`,
           {
-            mentions: [target]
+            mentions: [
+              target
+            ]
           }
         );
       } catch {
@@ -1666,7 +2001,9 @@ async function handleCommand(
 
     case "left": {
       if (
-        !hasOwnerAccess(sender)
+        !hasOwnerAccess(
+          sender
+        )
       ) {
         return sendText(
           jid,
@@ -1676,9 +2013,8 @@ async function handleCommand(
 
       if (
         !isGroupJid(jid)
-      ) {
+      )
         return;
-      }
 
       await sendText(
         jid,
@@ -1693,10 +2029,6 @@ async function handleCommand(
 
       return;
     }
-
-    // =========================
-    // PROTECTIONS
-    // =========================
 
     case "antilink": {
       const metadata =
@@ -1746,9 +2078,8 @@ async function handleCommand(
       }
 
       if (
-        ["kick", "delete"].includes(
-          action
-        )
+        ["kick", "delete"]
+          .includes(action)
       ) {
         setProtection(
           jid,
@@ -1765,7 +2096,9 @@ async function handleCommand(
       }
 
       const p =
-        getProtection(jid);
+        getProtection(
+          jid
+        );
 
       await sendText(
         jid,
@@ -1824,7 +2157,9 @@ async function handleCommand(
       }
 
       const p =
-        getProtection(jid);
+        getProtection(
+          jid
+        );
 
       await sendText(
         jid,
@@ -1834,10 +2169,6 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // AFK
-    // =========================
-
     case "afk": {
       if (
         args[0] === "list"
@@ -1846,7 +2177,9 @@ async function handleCommand(
           getAFK();
 
         const entries =
-          Object.entries(afk);
+          Object.entries(
+            afk
+          );
 
         await sendText(
           jid,
@@ -1883,10 +2216,6 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // FANCY
-    // =========================
-
     case "fancy": {
       if (!text) {
         return sendText(
@@ -1896,29 +2225,29 @@ async function handleCommand(
       }
 
       const style =
-        Number(args[0]) || 1;
+        Number(args[0]) ||
+        1;
 
       const actualText =
         Number.isNaN(
           Number(args[0])
         )
           ? text
-          : args.slice(1).join(" ");
+          : args
+              .slice(1)
+              .join(" ");
 
       await sendText(
         jid,
         fancy(
-          actualText || text,
+          actualText ||
+            text,
           style
         )
       );
 
       return;
     }
-
-    // =========================
-    // PINTEREST
-    // =========================
 
     case "pinterest":
     case "pin": {
@@ -1952,7 +2281,8 @@ async function handleCommand(
               }
             },
             {
-              quoted: message
+              quoted:
+                message
             }
           );
 
@@ -1975,14 +2305,13 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // COUPLE
-    // =========================
-
     case "couple": {
       if (
-        !await requireGroup(jid)
-      ) return;
+        !await requireGroup(
+          jid
+        )
+      )
+        return;
 
       const metadata =
         await getGroupMetadata(
@@ -1991,7 +2320,9 @@ async function handleCommand(
 
       const members =
         metadata.participants
-          .map(p => p.id)
+          .map(
+            p => p.id
+          )
           .filter(
             x =>
               normalizeNumber(
@@ -2014,10 +2345,14 @@ async function handleCommand(
       }
 
       const target1 =
-        getMentioned(message)[0];
+        getMentioned(
+          message
+        )[0];
 
       const target2 =
-        getMentioned(message)[1];
+        getMentioned(
+          message
+        )[1];
 
       if (
         target1 &&
@@ -2025,7 +2360,8 @@ async function handleCommand(
       ) {
         const percentage =
           Math.floor(
-            Math.random() * 101
+            Math.random() *
+            101
           );
 
         await sendMention(
@@ -2074,10 +2410,6 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // COUPLE PFP
-    // =========================
-
     case "couplepp": {
       await react(
         jid,
@@ -2092,7 +2424,9 @@ async function handleCommand(
           );
 
         const image =
-          randomItem(images);
+          randomItem(
+            images
+          );
 
         await sock.sendMessage(
           jid,
@@ -2104,7 +2438,8 @@ async function handleCommand(
               "💞 PFP couple anime matching"
           },
           {
-            quoted: message
+            quoted:
+              message
           }
         );
       } catch {
@@ -2116,10 +2451,6 @@ async function handleCommand(
 
       return;
     }
-
-    // =========================
-    // PLAY / SONG
-    // =========================
 
     case "play":
     case "song": {
@@ -2139,13 +2470,11 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // GET PP
-    // =========================
-
     case "getpp": {
       const target =
-        getTargetJid(message) ||
+        getTargetJid(
+          message
+        ) ||
         sender;
 
       try {
@@ -2165,8 +2494,11 @@ async function handleCommand(
               `🖼️ Photo de profil de @${jidToNumber(target)}`
           },
           {
-            quoted: message,
-            mentions: [target]
+            quoted:
+              message,
+            mentions: [
+              target
+            ]
           }
         );
       } catch {
@@ -2179,13 +2511,11 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // TAKE
-    // =========================
-
     case "take": {
       const quoted =
-        getQuoted(message);
+        getQuoted(
+          message
+        );
 
       if (
         !quoted?.stickerMessage
@@ -2212,10 +2542,12 @@ async function handleCommand(
         await sock.sendMessage(
           jid,
           {
-            sticker: buffer
+            sticker:
+              buffer
           },
           {
-            quoted: message
+            quoted:
+              message
           }
         );
       } catch {
@@ -2228,10 +2560,6 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // KIKI
-    // =========================
-
     case "kiki": {
       await sendText(
         jid,
@@ -2241,15 +2569,15 @@ async function handleCommand(
       return;
     }
 
-    // =========================
-    // DELETE
-    // =========================
-
     case "delete": {
-      const quoted =
-        getQuoted(message);
+      const context =
+        getContext(
+          message
+        );
 
-      if (!quoted) {
+      if (
+        !context?.stanzaId
+      ) {
         return sendText(
           jid,
           "❌ Réponds au message à supprimer."
@@ -2261,20 +2589,14 @@ async function handleCommand(
           jid,
           {
             delete: {
-              remoteJid: jid,
-              fromMe: false,
+              remoteJid:
+                jid,
+              fromMe:
+                false,
               id:
-                message
-                  ?.message
-                  ?.extendedTextMessage
-                  ?.contextInfo
-                  ?.stanzaId,
+                context.stanzaId,
               participant:
-                message
-                  ?.message
-                  ?.extendedTextMessage
-                  ?.contextInfo
-                  ?.participant
+                context.participant
             }
           }
         );
@@ -2287,10 +2609,6 @@ async function handleCommand(
 
       return;
     }
-
-    // =========================
-    // THEME
-    // =========================
 
     case "theme": {
       const requested =
@@ -2326,9 +2644,8 @@ async function handleCommand(
       return;
     }
 
-    default: {
+    default:
       return;
-    }
   }
 }
 
@@ -2340,12 +2657,15 @@ async function handleMessage(
   message
 ) {
   try {
-    if (!message?.message)
+    if (
+      !message?.message
+    )
       return;
 
     if (
       message.key.fromMe
-    ) return;
+    )
+      return;
 
     const jid =
       message.key.remoteJid;
@@ -2354,14 +2674,14 @@ async function handleMessage(
       return;
 
     const sender =
-      getSenderJid(message);
+      getSenderJid(
+        message
+      );
 
     const text =
-      getText(message);
-
-    // =========================
-    // AFK AUTO REMOVE
-    // =========================
+      getText(
+        message
+      );
 
     const afk =
       getAFK();
@@ -2388,21 +2708,21 @@ async function handleMessage(
         `👋 ${cleanMention(sender)} est de retour !\n` +
         `⏱️ AFK : ${duration}`,
         {
-          mentions: [sender]
+          mentions: [
+            sender
+          ]
         }
       );
     }
-
-    // =========================
-    // ANTILINK
-    // =========================
 
     if (
       isGroupJid(jid) &&
       text
     ) {
       const protection =
-        getProtection(jid);
+        getProtection(
+          jid
+        );
 
       if (
         protection.antilink &&
@@ -2418,7 +2738,9 @@ async function handleMessage(
             metadata,
             sender
           ) &&
-          !hasOwnerAccess(sender)
+          !hasOwnerAccess(
+            sender
+          )
         ) {
           if (
             protection.antilinkAction ===
@@ -2428,7 +2750,8 @@ async function handleMessage(
               await sock.sendMessage(
                 jid,
                 {
-                  delete: message.key
+                  delete:
+                    message.key
                 }
               );
             } catch {}
@@ -2439,7 +2762,9 @@ async function handleMessage(
             "kick"
           ) {
             if (
-              isBotAdmin(metadata)
+              isBotAdmin(
+                metadata
+              )
             ) {
               try {
                 await sock.groupParticipantsUpdate(
@@ -2456,12 +2781,10 @@ async function handleMessage(
       }
     }
 
-    // =========================
-    // COMMAND
-    // =========================
-
     const parsed =
-      parseCommand(text);
+      parseCommand(
+        text
+      );
 
     if (!parsed)
       return;
@@ -2496,17 +2819,15 @@ async function handleParticipants(
     } = update;
 
     if (
-      !["add", "remove"].includes(
-        action
-      )
+      !["add", "remove"]
+        .includes(action)
     ) {
       return;
     }
 
-    const metadata =
-      await getGroupMetadata(
-        id
-      );
+    await getGroupMetadata(
+      id
+    );
 
     const image =
       action === "add"
@@ -2514,7 +2835,8 @@ async function handleParticipants(
         : OFFICIAL_IMAGES.goodbye;
 
     for (
-      const participant of participants
+      const participant
+      of participants
     ) {
       const name =
         `@${jidToNumber(
@@ -2527,12 +2849,27 @@ async function handleParticipants(
           : `👋 ${name} nous quitte.\n\nÀ plus !`;
 
       try {
-        await sendMention(
+        await sock.sendMessage(
           id,
-          text,
-          [participant]
+          {
+            image: {
+              url: image
+            },
+            caption: text,
+            mentions: [
+              participant
+            ]
+          }
         );
-      } catch {}
+      } catch {
+        try {
+          await sendMention(
+            id,
+            text,
+            [participant]
+          );
+        } catch {}
+      }
     }
 
   } catch (
@@ -2546,11 +2883,139 @@ async function handleParticipants(
 }
 
 // ===============================
+// PAIRING
+// ===============================
+
+async function requestPairingCode(
+  state
+) {
+  if (
+    state.creds.registered
+  ) {
+    console.log(
+      "✅ Session WhatsApp déjà enregistrée."
+    );
+
+    return;
+  }
+
+  if (
+    pairingRequested
+  ) {
+    return;
+  }
+
+  const pairingNumber =
+    normalizeNumber(
+      process.env.PAIRING_NUMBER ||
+      ""
+    );
+
+  if (!pairingNumber) {
+    console.error(
+      "❌ PAIRING_NUMBER est absent de Railway."
+    );
+
+    console.error(
+      "👉 Ajoute : PAIRING_NUMBER=ton_numero"
+    );
+
+    return;
+  }
+
+  if (
+    pairingNumber.length < 8
+  ) {
+    console.error(
+      "❌ PAIRING_NUMBER semble invalide."
+    );
+
+    return;
+  }
+
+  pairingRequested = true;
+
+  try {
+    console.log(
+      "⏳ Préparation du pairing..."
+    );
+
+    await sleep(3000);
+
+    if (
+      !sock
+    ) {
+      pairingRequested =
+        false;
+
+      return;
+    }
+
+    const code =
+      await sock.requestPairingCode(
+        pairingNumber
+      );
+
+    console.log("");
+    console.log(
+      "╔══════════════════════════════════════╗"
+    );
+    console.log(
+      "║      🔐 NICOLAS ULTRA XMD           ║"
+    );
+    console.log(
+      "║          PAIRING CODE               ║"
+    );
+    console.log(
+      "╠══════════════════════════════════════╣"
+    );
+    console.log(
+      `║  CODE : ${code}`
+    );
+    console.log(
+      "╚══════════════════════════════════════╝"
+    );
+    console.log("");
+    console.log(
+      "📱 WhatsApp → Appareils connectés"
+    );
+    console.log(
+      "📱 → Connecter un appareil"
+    );
+    console.log(
+      "📱 → Connecter avec un numéro de téléphone"
+    );
+    console.log(
+      "📱 → Entre le code affiché ci-dessus."
+    );
+    console.log("");
+
+  } catch (error) {
+    pairingRequested =
+      false;
+
+    console.error(
+      "❌ ERREUR PAIRING :",
+      error?.message ||
+      error
+    );
+
+    console.log(
+      "🔄 Une nouvelle tentative sera faite au prochain démarrage."
+    );
+  }
+}
+
+// ===============================
 // START BOT
 // ===============================
 
 async function startBot() {
-  if (starting) return;
+  if (
+    starting
+  ) {
+    return;
+  }
 
   starting = true;
 
@@ -2573,9 +3038,11 @@ async function startBot() {
         version,
         auth: state,
         logger: pino({
-          level: "silent"
+          level:
+            "silent"
         }),
-        printQRInTerminal: false,
+        printQRInTerminal:
+          false,
         browser: [
           BOT_NAME,
           "Chrome",
@@ -2583,13 +3050,20 @@ async function startBot() {
         ],
         generateHighQualityLinkPreview:
           true,
-        syncFullHistory: false,
-        markOnlineOnConnect: false
+        syncFullHistory:
+          false,
+        markOnlineOnConnect:
+          false
       });
 
     sock.ev.on(
       "creds.update",
       saveCreds
+    );
+
+    // 🔐 PAIRING AU DÉMARRAGE
+    await requestPairingCode(
+      state
     );
 
     sock.ev.on(
@@ -2600,10 +3074,12 @@ async function startBot() {
       }) => {
         if (
           type !== "notify"
-        ) return;
+        )
+          return;
 
         for (
-          const message of messages
+          const message
+          of messages
         ) {
           await handleMessage(
             message
@@ -2629,11 +3105,36 @@ async function startBot() {
           connection ===
           "open"
         ) {
+          console.log("");
           console.log(
-            `✅ ${BOT_NAME} connecté !`
+            "╔══════════════════════════════════════╗"
           );
+          console.log(
+            `║     🟢 ${BOT_NAME} CONNECTÉ`
+          );
+          console.log(
+            `║             v${VERSION}`
+          );
+          console.log(
+            "╚══════════════════════════════════════╝"
+          );
+          console.log("");
 
           starting = false;
+
+          pairingRequested =
+            false;
+
+          if (
+            pairingTimeout
+          ) {
+            clearTimeout(
+              pairingTimeout
+            );
+
+            pairingTimeout =
+              null;
+          }
 
           if (
             reconnectTimer
@@ -2653,7 +3154,8 @@ async function startBot() {
           connection ===
           "close"
         ) {
-          starting = false;
+          starting =
+            false;
 
           const statusCode =
             lastDisconnect
@@ -2670,7 +3172,11 @@ async function startBot() {
             DisconnectReason.loggedOut
           ) {
             console.log(
-              "🔴 Session déconnectée. Reconnexion manuelle nécessaire."
+              "🔴 Session déconnectée."
+            );
+
+            console.log(
+              "🧹 Supprime la session AUTH puis relance le bot pour refaire le pairing."
             );
 
             return;
@@ -2687,6 +3193,9 @@ async function startBot() {
           reconnectTimer =
             setTimeout(
               () => {
+                pairingRequested =
+                  false;
+
                 startBot();
               },
               5000
@@ -2696,7 +3205,8 @@ async function startBot() {
     );
 
   } catch (error) {
-    starting = false;
+    starting =
+      false;
 
     console.error(
       "START ERROR:",
@@ -2714,6 +3224,9 @@ async function startBot() {
     reconnectTimer =
       setTimeout(
         () => {
+          pairingRequested =
+            false;
+
           startBot();
         },
         10000
@@ -2752,5 +3265,11 @@ process.on(
 console.log(
   `🚀 ${BOT_NAME} v${VERSION}`
 );
+
+if (!process.env.PAIRING_NUMBER) {
+  console.error(
+    "⚠️ PAIRING_NUMBER n'est pas défini dans Railway."
+  );
+}
 
 startBot();
