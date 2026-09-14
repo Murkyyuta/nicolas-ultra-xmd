@@ -32,6 +32,12 @@ const AUTH_DIR =
 
 const OWNER_NAME = "Nicolas";
 
+function normalizeNumber(number = "") {
+  return String(number)
+    .replace(/\D/g, "")
+    .replace(/^00/, "");
+}
+
 const OWNER_NUMBER = normalizeNumber(
   process.env.OWNER_NUMBER ||
   process.env.PAIRING_NUMBER ||
@@ -187,6 +193,12 @@ let starting = false;
 
 let pairingRequested = false;
 
+let pairingInProgress = false;
+
+let pairingSession = false;
+
+let botGeneration = 0;
+
 // ===============================
 // HELPERS
 // ===============================
@@ -210,12 +222,6 @@ function jidToNumber(jid = "") {
     .split("@")[0]
     .split(":")[0]
     .replace(/\D/g, "");
-}
-
-function normalizeNumber(number = "") {
-  return String(number)
-    .replace(/\D/g, "")
-    .replace(/^00/, "");
 }
 
 function isGroupJid(jid = "") {
@@ -2925,13 +2931,13 @@ async function handleParticipants(
 }
 
 // ============================================================
-// PAIRING CORRIGÉ
+// PAIRING SYSTEM
 // ============================================================
 
 async function requestPairingCode(
-  state
+  state,
+  generation
 ) {
-  // Session déjà enregistrée
   if (
     state.creds.registered
   ) {
@@ -2942,10 +2948,14 @@ async function requestPairingCode(
     return;
   }
 
-  // Évite plusieurs demandes simultanées
   if (
-    pairingRequested
+    pairingRequested ||
+    pairingInProgress
   ) {
+    console.log(
+      "⏳ Une demande de pairing est déjà en cours."
+    );
+
     return;
   }
 
@@ -2988,7 +2998,20 @@ async function requestPairingCode(
     return;
   }
 
-  pairingRequested = true;
+  if (
+    generation !== botGeneration
+  ) {
+    return;
+  }
+
+  pairingRequested =
+    true;
+
+  pairingInProgress =
+    true;
+
+  pairingSession =
+    true;
 
   try {
     console.log("");
@@ -2996,20 +3019,64 @@ async function requestPairingCode(
       "⏳ Préparation du pairing..."
     );
 
-    // On laisse le socket s'initialiser
-    await sleep(5000);
+    // Laisse WhatsApp initialiser complètement
+    await sleep(3500);
+
+    if (
+      generation !== botGeneration
+    ) {
+      return;
+    }
 
     if (!sock) {
-      pairingRequested =
-        false;
+      throw new Error(
+        "Socket WhatsApp indisponible"
+      );
+    }
+
+    // Si la session vient d'être enregistrée entre-temps,
+    // inutile de demander un nouveau code.
+    if (
+      state.creds.registered
+    ) {
+      console.log(
+        "✅ Session enregistrée pendant le démarrage."
+      );
 
       return;
     }
 
+    const currentSocket =
+      sock;
+
     const code =
-      await sock.requestPairingCode(
+      await currentSocket.requestPairingCode(
         pairingNumber
       );
+
+    // Ne jamais afficher un ancien code provenant
+    // d'un socket qui n'est plus actif.
+    if (
+      currentSocket !== sock ||
+      generation !== botGeneration
+    ) {
+      console.log(
+        "⚠️ Ancien socket de pairing ignoré."
+      );
+
+      return;
+    }
+
+    const cleanCode =
+      String(code || "")
+        .replace(/-/g, "")
+        .trim();
+
+    if (!cleanCode) {
+      throw new Error(
+        "WhatsApp n'a retourné aucun code."
+      );
+    }
 
     console.log("");
     console.log(
@@ -3025,7 +3092,7 @@ async function requestPairingCode(
       "╠══════════════════════════════════════╣"
     );
     console.log(
-      `║          ${code}                  ║`
+      `║          ${cleanCode}                  ║`
     );
     console.log(
       "╠══════════════════════════════════════╣"
@@ -3048,26 +3115,89 @@ async function requestPairingCode(
       "📱 Entre maintenant le code dans WhatsApp."
     );
 
+    console.log(
+      "⏳ N'arrête pas Railway pendant le pairing."
+    );
+
     console.log("");
 
   } catch (error) {
-    pairingRequested =
-      false;
+    const message =
+      error?.message ||
+      String(error);
 
+    console.error("");
     console.error(
       "❌ ERREUR PAIRING :",
-      error?.message ||
-      error
+      message
     );
 
+    // IMPORTANT :
+    // Ne pas supprimer l'auth ici.
+    // Un 401/Connection Closed pendant un pairing neuf
+    // peut arriver avant la fin du processus.
     console.log(
-      "⚠️ Le pairing n'a pas pu être généré."
+      "⚠️ La connexion de pairing a été interrompue."
     );
+
+    if (
+      /401|connection closed|connection failure/i.test(
+        message
+      )
+    ) {
+      console.log(
+        "🔄 Une nouvelle tentative sera effectuée automatiquement."
+      );
+    }
+
+  } finally {
+    pairingInProgress =
+      false;
   }
 }
 
 // ============================================================
-// START BOT CORRIGÉ
+// RECONNECT
+// ============================================================
+
+function scheduleReconnect(
+  delay = 5000
+) {
+  if (
+    reconnectTimer
+  ) {
+    return;
+  }
+
+  reconnectTimer =
+    setTimeout(
+      () => {
+        reconnectTimer =
+          null;
+
+        pairingRequested =
+          false;
+
+        pairingInProgress =
+          false;
+
+        pairingSession =
+          false;
+
+        console.log("");
+        console.log(
+          "🔄 Nouvelle tentative de connexion..."
+        );
+        console.log("");
+
+        startBot();
+      },
+      delay
+    );
+}
+
+// ============================================================
+// START BOT
 // ============================================================
 
 async function startBot() {
@@ -3077,7 +3207,11 @@ async function startBot() {
     return;
   }
 
-  starting = true;
+  starting =
+    true;
+
+  const generation =
+    ++botGeneration;
 
   try {
     // =========================
@@ -3093,7 +3227,7 @@ async function startBot() {
       );
 
     // =========================
-    // BAILEYS VERSION
+    // VERSION
     // =========================
 
     const {
@@ -3110,11 +3244,23 @@ async function startBot() {
       "🔧 Initialisation de WhatsApp..."
     );
 
+    if (
+      state.creds.registered
+    ) {
+      console.log(
+        "🔐 Session WhatsApp existante détectée."
+      );
+    } else {
+      console.log(
+        "🔐 Aucune session WhatsApp trouvée."
+      );
+    }
+
     // =========================
     // SOCKET
     // =========================
 
-    sock =
+    const newSocket =
       makeWASocket({
         version,
 
@@ -3141,8 +3287,20 @@ async function startBot() {
           false,
 
         markOnlineOnConnect:
-          false
+          false,
+
+        connectTimeoutMs:
+          60000,
+
+        defaultQueryTimeoutMs:
+          60000,
+
+        keepAliveIntervalMs:
+          30000
       });
+
+    sock =
+      newSocket;
 
     // =========================
     // SAVE CREDENTIALS
@@ -3155,17 +3313,37 @@ async function startBot() {
 
     // ========================================================
     // CONNECTION UPDATE
-    // IMPORTANT :
-    // On installe connection.update AVANT le pairing.
     // ========================================================
 
     sock.ev.on(
       "connection.update",
       async update => {
+        if (
+          newSocket !== sock ||
+          generation !== botGeneration
+        ) {
+          return;
+        }
+
         const {
           connection,
           lastDisconnect
         } = update;
+
+        // =====================
+        // CONNECTING
+        // =====================
+
+        if (
+          connection ===
+          "connecting"
+        ) {
+          console.log(
+            "🔄 Connexion à WhatsApp..."
+          );
+
+          return;
+        }
 
         // =====================
         // CONNECTÉ
@@ -3194,6 +3372,12 @@ async function startBot() {
             false;
 
           pairingRequested =
+            false;
+
+          pairingInProgress =
+            false;
+
+          pairingSession =
             false;
 
           if (
@@ -3251,7 +3435,7 @@ async function startBot() {
           }
 
           // ===================
-          // LOGGED OUT
+          // SESSION INVALIDÉE
           // ===================
 
           if (
@@ -3260,47 +3444,142 @@ async function startBot() {
           ) {
             console.log("");
 
+            if (
+              state.creds.registered
+            ) {
+              console.log(
+                "🔴 SESSION WHATSAPP INVALIDÉE."
+              );
+
+              console.log(
+                "🧹 Cette session enregistrée n'est plus valide."
+              );
+
+              console.log(
+                `📁 AUTH : ${AUTH_DIR}`
+              );
+
+              console.log(
+                "➡️ Supprime uniquement l'ancienne session AUTH puis relance Railway."
+              );
+
+              console.log("");
+              return;
+            }
+
+            // Cas important :
+            // 401 pendant un premier pairing.
             console.log(
-              "🔴 SESSION WHATSAPP INVALIDÉE."
+              "⚠️ 401 pendant le premier pairing."
             );
 
             console.log(
-              "🧹 Supprime l'ancienne session AUTH puis relance Railway."
+              "🔄 Ce n'est pas traité comme une session déjà enregistrée."
             );
 
-            console.log("");
+            console.log(
+              "🔄 Nouvelle tentative de pairing..."
+            );
+
+            pairingRequested =
+              false;
+
+            pairingInProgress =
+              false;
+
+            pairingSession =
+              false;
+
+            scheduleReconnect(
+              7000
+            );
 
             return;
           }
 
           // ===================
-          // RECONNEXION
+          // 401 / PAIRING NEUF
           // ===================
 
           if (
-            reconnectTimer
+            statusCode ===
+              401 &&
+            !state.creds.registered
           ) {
-            clearTimeout(
-              reconnectTimer
+            console.log("");
+            console.log(
+              "⚠️ 401 reçu pendant le pairing initial."
             );
+
+            console.log(
+              "❌ Le socket de pairing vient de fermer."
+            );
+
+            console.log(
+              "🔄 Nouvelle tentative automatique dans quelques secondes."
+            );
+            console.log("");
+
+            pairingRequested =
+              false;
+
+            pairingInProgress =
+              false;
+
+            pairingSession =
+              false;
+
+            scheduleReconnect(
+              7000
+            );
+
+            return;
           }
 
-          reconnectTimer =
-            setTimeout(
-              () => {
-                pairingRequested =
-                  false;
+          // ===================
+          // RESTART REQUIRED
+          // ===================
 
-                console.log("");
-                console.log(
-                  "🔄 Nouvelle tentative de connexion..."
-                );
-                console.log("");
-
-                startBot();
-              },
-              5000
+          if (
+            statusCode ===
+            DisconnectReason.restartRequired
+          ) {
+            console.log(
+              "🔄 WhatsApp demande un redémarrage du socket."
             );
+
+            pairingRequested =
+              false;
+
+            pairingInProgress =
+              false;
+
+            pairingSession =
+              false;
+
+            scheduleReconnect(
+              3000
+            );
+
+            return;
+          }
+
+          // ===================
+          // RECONNEXION NORMALE
+          // ===================
+
+          pairingRequested =
+            false;
+
+          pairingInProgress =
+            false;
+
+          pairingSession =
+            false;
+
+          scheduleReconnect(
+            5000
+          );
         }
       }
     );
@@ -3348,22 +3627,28 @@ async function startBot() {
     if (
       !state.creds.registered
     ) {
-      console.log(
-        "🔐 Aucune session WhatsApp trouvée."
-      );
+      await sleep(1500);
 
-      // Les listeners sont déjà installés
-      await sleep(2000);
+      if (
+        generation !== botGeneration ||
+        newSocket !== sock
+      ) {
+        return;
+      }
 
       await requestPairingCode(
-        state
+        state,
+        generation
       );
 
     } else {
       console.log(
-        "🔐 Session WhatsApp existante détectée."
+        "🔐 Session WhatsApp existante : connexion automatique."
       );
     }
+
+    starting =
+      false;
 
   } catch (error) {
     starting =
@@ -3379,24 +3664,18 @@ async function startBot() {
 
     console.error("");
 
-    if (
-      reconnectTimer
-    ) {
-      clearTimeout(
-        reconnectTimer
-      );
-    }
+    pairingRequested =
+      false;
 
-    reconnectTimer =
-      setTimeout(
-        () => {
-          pairingRequested =
-            false;
+    pairingInProgress =
+      false;
 
-          startBot();
-        },
-        10000
-      );
+    pairingSession =
+      false;
+
+    scheduleReconnect(
+      10000
+    );
   }
 }
 
