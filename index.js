@@ -188,6 +188,7 @@ function writeJSON(file, data) {
 
 let sock = null;
 let reconnectTimer = null;
+let pairingTimer = null;
 let starting = false;
 
 let pairingRequested = false;
@@ -3021,10 +3022,10 @@ async function requestPairingCode(
     );
 
     /*
-     * On attend un peu que le handshake initial
-     * soit correctement établi.
+     * Le socket doit être suffisamment initialisé
+     * avant la demande du code.
      */
-    await sleep(3000);
+    await sleep(500);
 
     if (
       generation !== botGeneration ||
@@ -3074,9 +3075,6 @@ async function requestPairingCode(
       );
     }
 
-    /*
-     * Format visuel XXXX-XXXX.
-     */
     const displayCode =
       cleanCode.length === 8
         ? `${cleanCode.slice(0, 4)}-${cleanCode.slice(4)}`
@@ -3126,33 +3124,31 @@ async function requestPairingCode(
     console.log("");
 
   } catch (error) {
-    const message =
+    const errorMessage =
       error?.message ||
       String(error);
 
     console.error("");
     console.error(
       "❌ ERREUR PAIRING :",
-      message
+      errorMessage
     );
 
     console.log(
       "⚠️ La connexion de pairing a été interrompue."
     );
 
-    /*
-     * IMPORTANT :
-     * On ne supprime jamais AUTH_DIR ici.
-     */
     if (
       /401|428|405|connection closed|connection failure|bad-request/i.test(
-        message
+        errorMessage
       )
     ) {
       console.log(
         "🔄 Une nouvelle tentative sera effectuée automatiquement."
       );
     }
+
+    console.log("");
 
   } finally {
     pairingInProgress =
@@ -3171,6 +3167,17 @@ function scheduleReconnect(
     reconnectTimer
   ) {
     return;
+  }
+
+  if (
+    pairingTimer
+  ) {
+    clearTimeout(
+      pairingTimer
+    );
+
+    pairingTimer =
+      null;
   }
 
   reconnectTimer =
@@ -3253,7 +3260,8 @@ async function startBot() {
           waVersion.isLatest
             ? "oui"
             : "non"
-        }`);
+        }`
+      );
 
     } catch (versionError) {
       console.error(
@@ -3262,10 +3270,6 @@ async function startBot() {
         versionError
       );
 
-      /*
-       * On laisse Baileys utiliser sa version interne
-       * plutôt que de casser complètement le démarrage.
-       */
       version =
         undefined;
     }
@@ -3306,11 +3310,6 @@ async function startBot() {
       printQRInTerminal:
         false,
 
-      /*
-       * IMPORTANT :
-       * navigateur canonique pour éviter
-       * certains codes de pairing morts.
-       */
       browser:
         Browsers.macOS(
           "Desktop"
@@ -3388,6 +3387,50 @@ async function startBot() {
             "🔄 Connexion à WhatsApp..."
           );
 
+          /*
+           * IMPORTANT :
+           * Le pairing est demandé depuis l'événement
+           * "connecting", comme dans l'ancienne version
+           * qui fonctionnait.
+           *
+           * Un timer empêche plusieurs demandes sur
+           * le même socket.
+           */
+          if (
+            !state.creds.registered &&
+            !pairingRequested &&
+            !pairingInProgress &&
+            !pairingTimer
+          ) {
+            pairingTimer =
+              setTimeout(
+                async () => {
+                  pairingTimer =
+                    null;
+
+                  if (
+                    newSocket !== sock ||
+                    generation !== botGeneration
+                  ) {
+                    return;
+                  }
+
+                  if (
+                    state.creds.registered
+                  ) {
+                    return;
+                  }
+
+                  await requestPairingCode(
+                    state,
+                    generation,
+                    newSocket
+                  );
+                },
+                1500
+              );
+          }
+
           return;
         }
 
@@ -3399,6 +3442,17 @@ async function startBot() {
           connection ===
           "open"
         ) {
+          if (
+            pairingTimer
+          ) {
+            clearTimeout(
+              pairingTimer
+            );
+
+            pairingTimer =
+              null;
+          }
+
           console.log("");
           console.log(
             "╔══════════════════════════════════════╗"
@@ -3450,6 +3504,17 @@ async function startBot() {
         ) {
           starting =
             false;
+
+          if (
+            pairingTimer
+          ) {
+            clearTimeout(
+              pairingTimer
+            );
+
+            pairingTimer =
+              null;
+          }
 
           const statusCode =
             lastDisconnect
@@ -3514,10 +3579,6 @@ async function startBot() {
               return;
             }
 
-            /*
-             * Si aucun compte n'était enregistré,
-             * on ne détruit rien et on retente.
-             */
             console.log(
               "⚠️ Fermeture pendant le premier pairing."
             );
@@ -3594,6 +3655,7 @@ async function startBot() {
             console.log(
               "🔄 Nouvelle tentative automatique."
             );
+
             console.log("");
 
             pairingRequested =
@@ -3731,33 +3793,21 @@ async function startBot() {
       handleParticipants
     );
 
-    // =========================
-    // PAIRING
-    // =========================
+    /*
+     * IMPORTANT :
+     *
+     * Le pairing n'est PAS appelé ici.
+     *
+     * Il est maintenant lancé dans
+     * connection.update → connecting.
+     *
+     * Cela évite la double demande et reproduit
+     * le comportement de l'ancienne version.
+     */
 
     if (
-      !state.creds.registered
+      state.creds.registered
     ) {
-      /*
-       * Petit délai initial.
-       * Le code est demandé sur CE socket uniquement.
-       */
-      await sleep(1500);
-
-      if (
-        generation !== botGeneration ||
-        newSocket !== sock
-      ) {
-        return;
-      }
-
-      await requestPairingCode(
-        state,
-        generation,
-        newSocket
-      );
-
-    } else {
       console.log(
         "🔐 Session WhatsApp existante : connexion automatique."
       );
@@ -3779,6 +3829,17 @@ async function startBot() {
     );
 
     console.error("");
+
+    if (
+      pairingTimer
+    ) {
+      clearTimeout(
+        pairingTimer
+      );
+
+      pairingTimer =
+        null;
+    }
 
     pairingRequested =
       false;
