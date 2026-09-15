@@ -3078,13 +3078,14 @@ async function startBot() {
         false,
 
       /*
-        Navigateur canonique.
-        Évite les problèmes de pairing
-        liés aux labels personnalisés.
+        Navigateur "Ubuntu / Chrome" : plus fiable
+        pour la génération du pairing code que la
+        signature macOS avec certaines versions
+        de WhatsApp Web / Baileys.
       */
       browser:
-        Browsers.macOS(
-          "Desktop"
+        Browsers.ubuntu(
+          "Chrome"
         ),
 
       generateHighQualityLinkPreview:
