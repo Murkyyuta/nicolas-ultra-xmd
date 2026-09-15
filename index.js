@@ -1,9 +1,3 @@
-// ============================================================
-// NICOLAS ULTRA XMD
-// Version 3.0.0
-// Single-file WhatsApp Bot
-// ============================================================
-
 require("dotenv").config();
 
 const {
@@ -19,9 +13,11 @@ const pino = require("pino");
 const fs = require("fs");
 const path = require("path");
 
-// ===============================
-// CONFIG
-// ===============================
+/* =========================================================
+   NICOLAS ULTRA XMD
+   VERSION 3.0.0
+   CONNEXION : PAIRING CODE UNIQUEMENT
+========================================================= */
 
 const BOT_NAME = "NICOLAS ULTRA XMD";
 const VERSION = "3.0.0";
@@ -32,6 +28,11 @@ const AUTH_DIR =
   "/app/auth_info_baileys";
 
 const OWNER_NAME = "Nicolas";
+const OWNER_TELEGRAM = "@Sage_ou_Nicolas";
+
+/* =========================================================
+   NUMERO DE PAIRING
+========================================================= */
 
 function normalizeNumber(number = "") {
   return String(number)
@@ -49,7 +50,9 @@ const OWNER_JID = OWNER_NUMBER
   ? `${OWNER_NUMBER}@s.whatsapp.net`
   : "";
 
-const OWNER_TELEGRAM = "@Sage_ou_Nicolas";
+/* =========================================================
+   IMAGES
+========================================================= */
 
 const OFFICIAL_IMAGES = {
   menu: "https://k.top4top.io/p_3908er0dq1.jpg",
@@ -75,11 +78,19 @@ const OFFICIAL_IMAGES = {
     "https://k.top4top.io/p_3908fwts41.jpg"
 };
 
+/* =========================================================
+   MENU MUSIC
+========================================================= */
+
 const MENU_MUSIC = path.join(
   process.cwd(),
   "assets",
   "menu.m4a"
 );
+
+/* =========================================================
+   THEMES
+========================================================= */
 
 const THEMES = [
   "solo",
@@ -94,49 +105,48 @@ const THEMES = [
   "blackclover"
 ];
 
-// ===============================
-// DATA
-// ===============================
+/* =========================================================
+   DATA
+========================================================= */
 
-const DATA_DIR = path.join(
-  process.cwd(),
-  "data"
+const DATA_DIR = path.join(process.cwd(), "data");
+
+const THEME_FILE = path.join(
+  DATA_DIR,
+  "theme.json"
 );
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, {
-    recursive: true
-  });
+const SUDO_FILE = path.join(
+  DATA_DIR,
+  "sudo.json"
+);
+
+const AFK_FILE = path.join(
+  DATA_DIR,
+  "afk.json"
+);
+
+const PROTECTION_FILE = path.join(
+  DATA_DIR,
+  "protections.json"
+);
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, {
+      recursive: true
+    });
+  }
 }
 
-const files = {
-  theme: path.join(
-    DATA_DIR,
-    "theme.json"
-  ),
+function ensureJSON(file, defaultValue) {
+  ensureDir(path.dirname(file));
 
-  sudo: path.join(
-    DATA_DIR,
-    "sudo.json"
-  ),
-
-  afk: path.join(
-    DATA_DIR,
-    "afk.json"
-  ),
-
-  protections: path.join(
-    DATA_DIR,
-    "protections.json"
-  )
-};
-
-function ensureJSON(file, fallback) {
   if (!fs.existsSync(file)) {
     fs.writeFileSync(
       file,
       JSON.stringify(
-        fallback,
+        defaultValue,
         null,
         2
       )
@@ -144,22 +154,10 @@ function ensureJSON(file, fallback) {
   }
 }
 
-ensureJSON(files.theme, {
-  global: "solo",
-  groups: {}
-});
-
-ensureJSON(files.sudo, []);
-
-ensureJSON(files.afk, {});
-
-ensureJSON(
-  files.protections,
-  {}
-);
-
 function readJSON(file, fallback) {
   try {
+    ensureJSON(file, fallback);
+
     return JSON.parse(
       fs.readFileSync(
         file,
@@ -172,6 +170,8 @@ function readJSON(file, fallback) {
 }
 
 function writeJSON(file, data) {
+  ensureDir(path.dirname(file));
+
   fs.writeFileSync(
     file,
     JSON.stringify(
@@ -182,41 +182,66 @@ function writeJSON(file, data) {
   );
 }
 
-// ===============================
-// STATE
-// ===============================
+ensureJSON(
+  THEME_FILE,
+  {
+    global: "solo",
+    groups: {}
+  }
+);
+
+ensureJSON(
+  SUDO_FILE,
+  []
+);
+
+ensureJSON(
+  AFK_FILE,
+  {}
+);
+
+ensureJSON(
+  PROTECTION_FILE,
+  {}
+);
+
+/* =========================================================
+   ETAT
+========================================================= */
 
 let sock = null;
 let reconnectTimer = null;
-let pairingTimer = null;
+
 let starting = false;
+let botGeneration = 0;
 
 let pairingRequested = false;
 let pairingInProgress = false;
-let pairingSession = false;
 
-let botGeneration = 0;
+/* =========================================================
+   UTILS
+========================================================= */
 
-// ===============================
-// HELPERS
-// ===============================
-
-const sleep = ms =>
-  new Promise(resolve =>
+function sleep(ms) {
+  return new Promise(resolve =>
     setTimeout(resolve, ms)
   );
+}
 
 function randomItem(array) {
+  if (!array || !array.length) {
+    return null;
+  }
+
   return array[
     Math.floor(
-      Math.random() *
-      array.length
+      Math.random() * array.length
     )
   ];
 }
 
 function jidToNumber(jid = "") {
-  return jid
+  return String(jid)
     .split("@")[0]
     .split(":")[0]
     .replace(/\D/g, "");
@@ -227,44 +252,45 @@ function isGroupJid(jid = "") {
 }
 
 function getSenderJid(message) {
+  if (!message) {
+    return "";
+  }
+
   return (
-    message?.key?.participant ||
-    message?.participant ||
-    message?.key?.remoteJid ||
+    message.key?.participant ||
+    message.key?.remoteJid ||
     ""
   );
 }
 
 function isOwner(jid) {
+  if (!jid) {
+    return false;
+  }
+
   if (!OWNER_NUMBER) {
     return false;
   }
 
   return (
-    normalizeNumber(
-      jidToNumber(jid)
-    ) === OWNER_NUMBER
+    jidToNumber(jid) === OWNER_NUMBER
   );
 }
 
 function getSudo() {
   return readJSON(
-    files.sudo,
+    SUDO_FILE,
     []
   );
 }
 
 function isSudo(jid) {
   const number =
-    normalizeNumber(
-      jidToNumber(jid)
-    );
+    jidToNumber(jid);
 
-  return getSudo().some(
-    x =>
-      normalizeNumber(x) ===
-      number
-  );
+  return getSudo()
+    .map(normalizeNumber)
+    .includes(number);
 }
 
 function hasOwnerAccess(jid) {
@@ -274,27 +300,68 @@ function hasOwnerAccess(jid) {
   );
 }
 
-function getText(message) {
-  const m =
-    message?.message;
+function escapeHTML(text = "") {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
-  if (!m) {
+/* =========================================================
+   MESSAGE TEXT
+========================================================= */
+
+function getText(message) {
+  if (!message) {
     return "";
   }
 
-  return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    m.documentMessage?.caption ||
-    ""
-  );
+  const content =
+    message.message || {};
+
+  if (
+    content.conversation
+  ) {
+    return content.conversation;
+  }
+
+  if (
+    content.extendedTextMessage
+      ?.text
+  ) {
+    return content
+      .extendedTextMessage
+      .text;
+  }
+
+  if (
+    content.imageMessage
+      ?.caption
+  ) {
+    return content
+      .imageMessage
+      .caption;
+  }
+
+  if (
+    content.videoMessage
+      ?.caption
+  ) {
+    return content
+      .videoMessage
+      .caption;
+  }
+
+  return "";
 }
+
+/* =========================================================
+   SEND
+========================================================= */
 
 async function react(
   jid,
-  key,
+  messageKey,
   emoji
 ) {
   try {
@@ -303,7 +370,7 @@ async function react(
       {
         react: {
           text: emoji,
-          key
+          key: messageKey
         }
       }
     );
@@ -318,213 +385,344 @@ async function sendText(
   return sock.sendMessage(
     jid,
     {
-      text
-    },
-    options
+      text: String(text),
+      ...options
+    }
   );
 }
 
 async function sendImage(
   jid,
-  image,
-  caption = "",
-  options = {}
+  url,
+  caption = ""
 ) {
   return sock.sendMessage(
     jid,
     {
       image: {
-        url: image
+        url
       },
       caption
-    },
-    options
+    }
   );
 }
 
+/* =========================================================
+   THEMES
+========================================================= */
+
 function getCurrentTheme(
-  jid = ""
+  jid
 ) {
-  const themes =
+  const data =
     readJSON(
-      files.theme,
+      THEME_FILE,
       {
         global: "solo",
         groups: {}
       }
     );
 
-  const name =
+  if (
     isGroupJid(jid) &&
-    themes.groups[jid]
-      ? themes.groups[jid]
-      : themes.global;
+    data.groups[jid]
+  ) {
+    return data.groups[jid];
+  }
 
-  return {
-    name,
-
-    menu:
-      OFFICIAL_IMAGES.menu,
-
-    alive:
-      OFFICIAL_IMAGES.alive,
-
-    ping:
-      OFFICIAL_IMAGES.ping,
-
-    welcome:
-      OFFICIAL_IMAGES.welcome,
-
-    goodbye:
-      OFFICIAL_IMAGES.goodbye
-  };
+  return data.global || "solo";
 }
 
 function setTheme(
   jid,
   theme
 ) {
-  if (
-    !THEMES.includes(theme)
-  ) {
-    return false;
-  }
-
-  const themes =
+  const data =
     readJSON(
-      files.theme,
+      THEME_FILE,
       {
         global: "solo",
         groups: {}
       }
     );
 
+  if (
+    !THEMES.includes(theme)
+  ) {
+    return false;
+  }
+
   if (isGroupJid(jid)) {
-    themes.groups[jid] =
-      theme;
+    data.groups[jid] = theme;
   } else {
-    themes.global =
-      theme;
+    data.global = theme;
   }
 
   writeJSON(
-    files.theme,
-    themes
+    THEME_FILE,
+    data
   );
 
   return true;
 }
 
-// ===============================
-// GROUP
-// ===============================
+/* =========================================================
+   GROUP HELPERS
+========================================================= */
 
 async function getGroupMetadata(
   jid
 ) {
-  return sock.groupMetadata(
-    jid
-  );
+  return sock.groupMetadata(jid);
 }
 
-function getGroupAdmins(
-  metadata
+async function getGroupAdmins(
+  jid
 ) {
+  const metadata =
+    await getGroupMetadata(jid);
+
   return metadata.participants
-    .filter(p => p.admin)
+    .filter(
+      p =>
+        p.admin === "admin" ||
+        p.admin === "superadmin"
+    )
     .map(p => p.id);
 }
 
-function isAdmin(
-  metadata,
-  jid
+async function isAdmin(
+  jid,
+  userJid
 ) {
-  const number =
-    normalizeNumber(
-      jidToNumber(jid)
-    );
+  const admins =
+    await getGroupAdmins(jid);
 
-  return metadata.participants.some(
-    p =>
-      normalizeNumber(
-        jidToNumber(p.id)
-      ) === number &&
-      !!p.admin
+  return admins.includes(
+    userJid
   );
 }
 
-function isBotAdmin(
-  metadata
+async function isBotAdmin(
+  jid
 ) {
   if (!sock?.user?.id) {
     return false;
   }
 
-  const botNumber =
-    normalizeNumber(
-      jidToNumber(
-        sock.user.id
-      )
-    );
-
-  return metadata.participants.some(
-    p =>
-      normalizeNumber(
-        jidToNumber(p.id)
-      ) === botNumber &&
-      !!p.admin
+  return isAdmin(
+    jid,
+    sock.user.id
   );
 }
 
 function getTargetJid(
-  message
+  message,
+  args
 ) {
-  const context =
-    message?.message
-      ?.extendedTextMessage
-      ?.contextInfo;
-
   const mentioned =
-    context?.mentionedJid ||
-    [];
+    message.message
+      ?.extendedTextMessage
+      ?.contextInfo
+      ?.mentionedJid || [];
 
-  if (
-    mentioned.length
-  ) {
+  if (mentioned.length) {
     return mentioned[0];
   }
 
+  const quoted =
+    message.message
+      ?.extendedTextMessage
+      ?.contextInfo
+      ?.participant;
+
+  if (quoted) {
+    return quoted;
+  }
+
   if (
-    context?.participant
+    args?.[0]
   ) {
-    return context.participant;
+    const number =
+      normalizeNumber(
+        args[0]
+      );
+
+    if (number) {
+      return (
+        number +
+        "@s.whatsapp.net"
+      );
+    }
   }
 
   return null;
 }
 
-// ===============================
-// FANCY
-// ===============================
+/* =========================================================
+   FANCY
+========================================================= */
 
 const FANCY_STYLES = [
   text =>
-    `𝑵𝑰𝑪𝑶𝑳𝑨𝑺 𝑼𝑳𝑻𝑹𝑨 𝑿𝑴𝑫`,
+    String(text)
+      .split("")
+      .map(c => {
+        const map = {
+          A: "𝑨",
+          B: "𝑩",
+          C: "𝑪",
+          D: "𝑫",
+          E: "𝑬",
+          F: "𝑭",
+          G: "𝑮",
+          H: "𝑯",
+          I: "𝑰",
+          J: "𝑱",
+          K: "𝑲",
+          L: "𝑳",
+          M: "𝑴",
+          N: "𝑵",
+          O: "𝑶",
+          P: "𝑷",
+          Q: "𝑸",
+          R: "𝑹",
+          S: "𝑺",
+          T: "𝑻",
+          U: "𝑼",
+          V: "𝑽",
+          W: "𝑾",
+          X: "𝑿",
+          Y: "𝒀",
+          Z: "𝒁"
+        };
+
+        return (
+          map[c.toUpperCase()] ||
+          c
+        );
+      })
+      .join(""),
 
   text =>
-    `𝓝𝓘𝓒𝓞𝓛𝓐𝓢 𝓤𝓛𝓣𝓡𝓐 𝓧𝓜𝓓`,
+    String(text)
+      .split("")
+      .map(c => {
+        const map = {
+          A: "𝓐",
+          B: "𝓑",
+          C: "𝓒",
+          D: "𝓓",
+          E: "𝓔",
+          F: "𝓕",
+          G: "𝓖",
+          H: "𝓗",
+          I: "𝓘",
+          J: "𝓙",
+          K: "𝓚",
+          L: "𝓛",
+          M: "𝓜",
+          N: "𝓝",
+          O: "𝓞",
+          P: "𝓟",
+          Q: "𝓠",
+          R: "𝓡",
+          S: "𝓢",
+          T: "𝓣",
+          U: "𝓤",
+          V: "𝓥",
+          W: "𝓦",
+          X: "𝓧",
+          Y: "𝓨",
+          Z: "𝓩"
+        };
+
+        return (
+          map[c.toUpperCase()] ||
+          c
+        );
+      })
+      .join(""),
 
   text =>
-    `𝗡𝗜𝗖𝗢𝗟𝗔𝗦 𝗨𝗟𝗧𝗥𝗔 𝗫𝗠𝗗`,
+    String(text)
+      .toUpperCase()
+      .split("")
+      .map(c => {
+        const map = {
+          A: "𝗔",
+          B: "𝗕",
+          C: "𝗖",
+          D: "𝗗",
+          E: "𝗘",
+          F: "𝗙",
+          G: "𝗚",
+          H: "𝗛",
+          I: "𝗜",
+          J: "𝗝",
+          K: "𝗞",
+          L: "𝗟",
+          M: "𝗠",
+          N: "𝗡",
+          O: "𝗢",
+          P: "𝗣",
+          Q: "𝗤",
+          R: "𝗥",
+          S: "𝗦",
+          T: "𝗧",
+          U: "𝗨",
+          V: "𝗩",
+          W: "𝗪",
+          X: "𝗫",
+          Y: "𝗬",
+          Z: "𝗭"
+        };
+
+        return (
+          map[c] || c
+        );
+      })
+      .join(""),
 
   text =>
-    `𝙉𝙄𝘾𝙊𝙇𝘼𝙎 𝙐𝙇𝙏𝙍𝘼 𝙓𝙈𝘿`,
+    String(text)
+      .split("")
+      .map(c => {
+        const map = {
+          A: "𝘼",
+          B: "𝘽",
+          C: "𝘾",
+          D: "𝘿",
+          E: "𝙀",
+          F: "𝙁",
+          G: "𝙂",
+          H: "𝙃",
+          I: "𝙄",
+          J: "𝙅",
+          K: "𝙆",
+          L: "𝙇",
+          M: "𝙈",
+          N: "𝙉",
+          O: "𝙊",
+          P: "𝙋",
+          Q: "𝙌",
+          R: "𝙍",
+          S: "𝙎",
+          T: "𝙏",
+          U: "𝙐",
+          V: "𝙑",
+          W: "𝙒",
+          X: "𝙓",
+          Y: "𝙔",
+          Z: "𝙕"
+        };
 
-  text =>
-    `ＮＩＣＯＬＡＳ ＵＬＴＲＡ ＸＭＤ`,
-
-  text =>
-    `Nɪᴄᴏʟᴀs Uʟᴛʀᴀ XMD`
+        return (
+          map[c.toUpperCase()] ||
+          c
+        );
+      })
+      .join("")
 ];
 
 function fancy(
@@ -540,303 +738,17 @@ function fancy(
   return fn(text);
 }
 
-// ===============================
-// MENU
-// ===============================
-
-const COMMANDS = [
-  ["alive", "Voir si le bot est en ligne"],
-  ["ping", "Tester la vitesse"],
-  ["speed", "Voir la vitesse du bot"],
-  ["owner", "Informations du propriétaire"],
-  ["repo", "Dépôt du projet"],
-  ["menu", "Afficher le menu"],
-
-  ["sudo", "Gérer les sudo"],
-  ["pair", "Connexion par pairing"],
-  ["purge", "Nettoyer les messages"],
-
-  ["add", "Ajouter un membre"],
-  ["ban", "Bannir un membre"],
-  ["kick", "Expulser un membre"],
-  ["promote", "Promouvoir admin"],
-  ["demote", "Retirer admin"],
-  ["tag", "Mentionner un membre"],
-  ["tagall", "Mentionner tout le groupe"],
-  ["groupinfo", "Informations du groupe"],
-  ["listadmin", "Liste des admins"],
-  ["staff", "Voir le staff"],
-  ["link", "Lien du groupe"],
-  ["revoke", "Réinitialiser le lien"],
-  ["groupname", "Changer le nom"],
-  ["setgdesc", "Changer la description"],
-  ["left", "Quitter le groupe"],
-
-  ["antilink", "Protection anti-lien"],
-  ["antipromote", "Protection anti-promotion"],
-
-  ["afk", "Mode absence"],
-  ["fancy", "Écriture stylée"],
-
-  ["pinterest", "Recherche Pinterest"],
-  ["pin", "Recherche Pinterest"],
-  ["couple", "Couple aléatoire"],
-  ["couplepp", "PFP couple anime"],
-  ["play", "Télécharger une musique"],
-  ["song", "Télécharger une musique"],
-
-  ["kiki", "Voir un média"],
-  ["take", "Sticker personnalisé"],
-  ["tourl", "Uploader un média"],
-  ["ssweb", "Capture d'un site"],
-  ["getpp", "Photo de profil"],
-  ["delete", "Supprimer un message"],
-
-  ["theme", "Changer le thème"]
-];
-
-function menuText() {
-  const style =
-    Math.floor(
-      Math.random() *
-      FANCY_STYLES.length
-    );
-
-  const title =
-    fancy(
-      BOT_NAME,
-      style
-    );
-
-  const lines = [];
-
-  lines.push(
-    `╭━━━〔 ${title} 〕━━━╮`
-  );
-
-  lines.push(
-    `┃ 👑 Owner : ${OWNER_NAME}`
-  );
-
-  lines.push(
-    `┃ ⚡ Version : ${VERSION}`
-  );
-
-  lines.push(
-    `┃ 🔰 Prefix : ${PREFIX}`
-  );
-
-  lines.push(
-    `╰━━━━━━━━━━━━━━━━╯`
-  );
-
-  lines.push("");
-
-  const groups = {
-    GENERAL: [],
-    OWNER: [],
-    GROUP: [],
-    PROTECTION: [],
-    MEDIA: [],
-    FUN: []
-  };
-
-  const general = [
-    "alive",
-    "ping",
-    "speed",
-    "owner",
-    "repo",
-    "menu"
-  ];
-
-  const owner = [
-    "sudo",
-    "pair",
-    "purge"
-  ];
-
-  const group = [
-    "add",
-    "ban",
-    "kick",
-    "promote",
-    "demote",
-    "tag",
-    "tagall",
-    "groupinfo",
-    "listadmin",
-    "staff",
-    "link",
-    "revoke",
-    "groupname",
-    "setgdesc",
-    "left"
-  ];
-
-  const protection = [
-    "antilink",
-    "antipromote"
-  ];
-
-  const media = [
-    "pinterest",
-    "pin",
-    "play",
-    "song",
-    "kiki",
-    "take",
-    "tourl",
-    "ssweb",
-    "getpp",
-    "delete"
-  ];
-
-  const fun = [
-    "couple",
-    "couplepp",
-    "afk",
-    "fancy",
-    "theme"
-  ];
-
-  for (
-    const [cmd, desc]
-    of COMMANDS
-  ) {
-    if (
-      general.includes(cmd)
-    ) {
-      groups.GENERAL.push([
-        cmd,
-        desc
-      ]);
-    }
-
-    else if (
-      owner.includes(cmd)
-    ) {
-      groups.OWNER.push([
-        cmd,
-        desc
-      ]);
-    }
-
-    else if (
-      group.includes(cmd)
-    ) {
-      groups.GROUP.push([
-        cmd,
-        desc
-      ]);
-    }
-
-    else if (
-      protection.includes(cmd)
-    ) {
-      groups.PROTECTION.push([
-        cmd,
-        desc
-      ]);
-    }
-
-    else if (
-      media.includes(cmd)
-    ) {
-      groups.MEDIA.push([
-        cmd,
-        desc
-      ]);
-    }
-
-    else if (
-      fun.includes(cmd)
-    ) {
-      groups.FUN.push([
-        cmd,
-        desc
-      ]);
-    }
-  }
-
-  for (
-    const [category, list]
-    of Object.entries(groups)
-  ) {
-    lines.push(
-      `╭─〔 ${category} 〕`
-    );
-
-    for (
-      const [cmd, desc]
-      of list
-    ) {
-      lines.push(
-        `│ ${PREFIX}${cmd} — ${desc}`
-      );
-    }
-
-    lines.push(
-      `╰────────────`
-    );
-
-    lines.push("");
-  }
-
-  lines.push(
-    `╰━━━〔 ${OWNER_TELEGRAM} 〕━━━╯`
-  );
-
-  return lines.join("\n");
-}
-
-// ===============================
-// PARSER
-// ===============================
-
-function parseCommand(text) {
-  if (
-    !text.startsWith(PREFIX)
-  ) {
-    return null;
-  }
-
-  const body =
-    text
-      .slice(PREFIX.length)
-      .trim();
-
-  if (!body) {
-    return null;
-  }
-
-  const parts =
-    body.split(/\s+/);
-
-  const command =
-    parts
-      .shift()
-      .toLowerCase();
-
-  return {
-    command,
-    args: parts,
-    text: parts.join(" ")
-  };
-}
-
-// ===============================
-// CONTEXT
-// ===============================
+/* =========================================================
+   CONTEXT
+========================================================= */
 
 function getContext(
   message
 ) {
   return (
-    message?.message
+    message.message
       ?.extendedTextMessage
-      ?.contextInfo ||
-    {}
+      ?.contextInfo || {}
   );
 }
 
@@ -845,8 +757,7 @@ function getQuoted(
 ) {
   return getContext(
     message
-  )?.quotedMessage ||
-    null;
+  ).quotedMessage;
 }
 
 function getMentioned(
@@ -855,38 +766,8 @@ function getMentioned(
   return (
     getContext(
       message
-    )?.mentionedJid ||
-    []
+    ).mentionedJid || []
   );
-}
-
-function formatDuration(
-  seconds
-) {
-  seconds =
-    Math.floor(seconds);
-
-  const h =
-    Math.floor(
-      seconds / 3600
-    );
-
-  const m =
-    Math.floor(
-      (seconds % 3600) /
-      60
-    );
-
-  const s =
-    seconds % 60;
-
-  return [
-    h ? `${h}h` : "",
-    m ? `${m}m` : "",
-    `${s}s`
-  ]
-    .filter(Boolean)
-    .join(" ");
 }
 
 function cleanMention(
@@ -909,15 +790,34 @@ function sendMention(
   );
 }
 
+function formatDuration(
+  seconds
+) {
+  const h =
+    Math.floor(
+      seconds / 3600
+    );
+
+  const m =
+    Math.floor(
+      (seconds % 3600) / 60
+    );
+
+  const s =
+    Math.floor(
+      seconds % 60
+    );
+
+  return `${h}h ${m}m ${s}s`;
+}
+
 async function requireGroup(
   jid
 ) {
-  if (
-    !isGroupJid(jid)
-  ) {
+  if (!isGroupJid(jid)) {
     await sendText(
       jid,
-      "❌ Cette commande fonctionne seulement dans un groupe."
+      "❌ Cette commande fonctionne uniquement dans un groupe."
     );
 
     return false;
@@ -931,208 +831,337 @@ async function requireAdmin(
   sender
 ) {
   if (
-    !await requireGroup(jid)
+    hasOwnerAccess(sender)
   ) {
-    return false;
+    return true;
   }
 
-  const metadata =
-    await getGroupMetadata(
-      jid
-    );
-
   if (
-    !hasOwnerAccess(sender) &&
-    !isAdmin(
-      metadata,
+    !(await isAdmin(
+      jid,
       sender
-    )
+    ))
   ) {
     await sendText(
       jid,
-      "❌ Cette commande est réservée aux admins."
+      "❌ Commande réservée aux admins."
     );
 
     return false;
   }
 
-  return metadata;
+  return true;
 }
 
-// ===============================
-// AFK
-// ===============================
+/* =========================================================
+   AFK
+========================================================= */
 
 function getAFK() {
   return readJSON(
-    files.afk,
+    AFK_FILE,
     {}
   );
 }
 
 function setAFK(
   jid,
-  data
+  reason
 ) {
-  const afk =
+  const data =
     getAFK();
 
-  if (
-    data === null
-  ) {
-    delete afk[jid];
-  } else {
-    afk[jid] = data;
-  }
+  data[jid] = {
+    reason:
+      reason ||
+      "Aucune raison",
+    time:
+      Date.now()
+  };
 
   writeJSON(
-    files.afk,
-    afk
+    AFK_FILE,
+    data
   );
 }
 
-// ===============================
-// PROTECTION
-// ===============================
-
-function getProtection(
+function clearAFK(
   jid
 ) {
-  const protections =
-    readJSON(
-      files.protections,
-      {}
+  const data =
+    getAFK();
+
+  if (data[jid]) {
+    delete data[jid];
+
+    writeJSON(
+      AFK_FILE,
+      data
     );
 
-  return (
-    protections[jid] || {
-      antilink: false,
-      antilinkAction:
-        "delete",
-      antipromote: false
-    }
+    return true;
+  }
+
+  return false;
+}
+
+/* =========================================================
+   PROTECTION
+========================================================= */
+
+function getProtections() {
+  return readJSON(
+    PROTECTION_FILE,
+    {}
   );
 }
 
 function setProtection(
   jid,
-  key,
+  type,
   value
 ) {
-  const protections =
-    readJSON(
-      files.protections,
-      {}
-    );
+  const data =
+    getProtections();
 
-  if (
-    !protections[jid]
-  ) {
-    protections[jid] = {
-      antilink: false,
-      antilinkAction:
-        "delete",
-      antipromote: false
-    };
+  if (!data[jid]) {
+    data[jid] = {};
   }
 
-  protections[jid][key] =
-    value;
+  data[jid][type] = value;
 
   writeJSON(
-    files.protections,
-    protections
+    PROTECTION_FILE,
+    data
   );
 }
 
-// ===============================
-// MEDIA
-// ===============================
+function getProtection(
+  jid,
+  type
+) {
+  const data =
+    getProtections();
+
+  return (
+    data[jid]?.[type] ||
+    false
+  );
+}
+
+/* =========================================================
+   MEDIA
+========================================================= */
 
 async function downloadMedia(
   message,
   type
 ) {
-  try {
-    const stream =
-      await downloadContentFromMessage(
-        message,
-        type
-      );
-
-    const chunks = [];
-
-    for await (
-      const chunk
-      of stream
-    ) {
-      chunks.push(chunk);
-    }
-
-    return Buffer.concat(
-      chunks
+  const stream =
+    await downloadContentFromMessage(
+      message,
+      type
     );
-  } catch {
-    return null;
+
+  const chunks = [];
+
+  for await (
+    const chunk of stream
+  ) {
+    chunks.push(chunk);
   }
+
+  return Buffer.concat(
+    chunks
+  );
 }
 
 function getMediaMessage(
   message
 ) {
-  const m =
-    message?.message;
-
-  if (!m) {
-    return null;
-  }
+  const content =
+    message.message || {};
 
   if (
-    m.imageMessage
+    content.imageMessage
   ) {
     return {
       type: "image",
-      message:
-        m.imageMessage
+      data:
+        content.imageMessage
     };
   }
 
   if (
-    m.videoMessage
+    content.videoMessage
   ) {
     return {
       type: "video",
-      message:
-        m.videoMessage
+      data:
+        content.videoMessage
     };
   }
 
   if (
-    m.audioMessage
+    content.audioMessage
   ) {
     return {
       type: "audio",
-      message:
-        m.audioMessage
+      data:
+        content.audioMessage
     };
   }
 
   if (
-    m.stickerMessage
+    content.stickerMessage
   ) {
     return {
       type: "sticker",
-      message:
-        m.stickerMessage
+      data:
+        content.stickerMessage
     };
   }
 
   return null;
 }
 
-// ===============================
-// PINTEREST
-// ===============================
+/* =========================================================
+   MENU
+========================================================= */
+
+function buildMenu(
+  jid
+) {
+  const theme =
+    getCurrentTheme(jid);
+
+  return `
+╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃
+┃ 👑 OWNER : ${OWNER_NAME}
+┃ ⚡ VERSION : ${VERSION}
+┃ 🎭 THEME : ${theme}
+┃ 📌 PREFIX : ${PREFIX}
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 GENERAL 〕━━╮
+┃ ${PREFIX}alive
+┃ ${PREFIX}ping
+┃ ${PREFIX}speed
+┃ ${PREFIX}owner
+┃ ${PREFIX}repo
+┃ ${PREFIX}help
+┃ ${PREFIX}list
+┃ ${PREFIX}menu
+╰━━━━━━━━━━━━━━╯
+
+╭━━〔 OWNER 〕━━╮
+┃ ${PREFIX}sudo add
+┃ ${PREFIX}sudo del
+┃ ${PREFIX}sudo list
+┃ ${PREFIX}pair
+┃ ${PREFIX}purge
+╰━━━━━━━━━━━━━━╯
+
+╭━━〔 GROUP 〕━━╮
+┃ ${PREFIX}add
+┃ ${PREFIX}ban
+┃ ${PREFIX}kick
+┃ ${PREFIX}promote
+┃ ${PREFIX}demote
+┃ ${PREFIX}tag
+┃ ${PREFIX}tagall
+┃ ${PREFIX}groupinfo
+┃ ${PREFIX}listadmin
+┃ ${PREFIX}staff
+┃ ${PREFIX}link
+┃ ${PREFIX}revoke
+┃ ${PREFIX}groupname
+┃ ${PREFIX}setgdesc
+┃ ${PREFIX}left
+╰━━━━━━━━━━━━━━╯
+
+╭━━〔 PROTECTION 〕━━╮
+┃ ${PREFIX}antilink
+┃ ${PREFIX}antipromote
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 MEDIA / FUN 〕━━╮
+┃ ${PREFIX}afk
+┃ ${PREFIX}fancy
+┃ ${PREFIX}pinterest
+┃ ${PREFIX}pin
+┃ ${PREFIX}couple
+┃ ${PREFIX}couplepp
+┃ ${PREFIX}play
+┃ ${PREFIX}song
+┃ ${PREFIX}kiki
+┃ ${PREFIX}take
+┃ ${PREFIX}tourl
+┃ ${PREFIX}ssweb
+┃ ${PREFIX}getpp
+┃ ${PREFIX}delete
+┃ ${PREFIX}theme
+╰━━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 NICOLAS ULTRA 〕━━╮
+┃ 👑 ${OWNER_NAME}
+┃ 🤖 ${BOT_NAME}
+┃ ⚔️ Shadow Monarch Mode
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+`;
+}
+
+async function sendMenu(
+  jid
+) {
+  const menu =
+    buildMenu(jid);
+
+  try {
+    await sock.sendMessage(
+      jid,
+      {
+        image: {
+          url:
+            OFFICIAL_IMAGES.menu
+        },
+        caption: menu
+      }
+    );
+  } catch {
+    await sendText(
+      jid,
+      menu
+    );
+  }
+
+  if (
+    fs.existsSync(
+      MENU_MUSIC
+    )
+  ) {
+    try {
+      await sock.sendMessage(
+        jid,
+        {
+          audio:
+            fs.readFileSync(
+              MENU_MUSIC
+            ),
+          mimetype:
+            "audio/mp4",
+          ptt: false
+        }
+      );
+    } catch {}
+  }
+}
+
+/* =========================================================
+   PINTEREST
+========================================================= */
 
 async function pinterestSearch(
   query
@@ -1168,195 +1197,168 @@ async function pinterestSearch(
   );
 }
 
-// ===============================
-// YOUTUBE PLAY
-// ===============================
+/* =========================================================
+   YOUTUBE
+========================================================= */
 
-async function playYouTube(
-  jid,
-  query,
-  quoted
+async function youtubeAudio(
+  query
 ) {
+  let yts;
+
   try {
-    const ytSearch =
-      require("yt-search");
+    yts = require(
+      "yt-search"
+    );
+  } catch {
+    throw new Error(
+      "yt-search non installé"
+    );
+  }
 
-    const ytdl =
-      require("@distube/ytdl-core");
+  let ytdl;
 
-    const result =
-      await ytSearch(
-        query
+  try {
+    ytdl = require(
+      "@distube/ytdl-core"
+    );
+  } catch {
+    throw new Error(
+      "@distube/ytdl-core non installé"
+    );
+  }
+
+  const result =
+    await yts(query);
+
+  if (
+    !result.videos ||
+    !result.videos.length
+  ) {
+    throw new Error(
+      "Aucune vidéo trouvée"
+    );
+  }
+
+  const video =
+    result.videos[0];
+
+  const stream =
+    ytdl(video.url, {
+      filter:
+        "audioonly",
+      quality:
+        "highestaudio"
+    });
+
+  const chunks = [];
+
+  for await (
+    const chunk of stream
+  ) {
+    chunks.push(chunk);
+
+    const size =
+      chunks.reduce(
+        (total, item) =>
+          total +
+          item.length,
+        0
       );
 
     if (
-      !result.videos ||
-      !result.videos.length
+      size >
+      15 * 1024 * 1024
     ) {
+      stream.destroy();
+
       throw new Error(
-        "No result"
+        "Audio trop lourd"
       );
     }
-
-    const video =
-      result.videos[0];
-
-    await react(
-      jid,
-      quoted.key,
-      "🎵"
-    );
-
-    const stream =
-      ytdl(
-        video.url,
-        {
-          filter:
-            "audioonly",
-          quality:
-            "highestaudio"
-        }
-      );
-
-    const chunks = [];
-
-    for await (
-      const chunk
-      of stream
-    ) {
-      chunks.push(chunk);
-
-      if (
-        Buffer.concat(
-          chunks
-        ).length >
-        15 * 1024 * 1024
-      ) {
-        throw new Error(
-          "Audio too large"
-        );
-      }
-    }
-
-    const buffer =
-      Buffer.concat(
-        chunks
-      );
-
-    await sock.sendMessage(
-      jid,
-      {
-        audio: buffer,
-        mimetype:
-          "audio/mpeg",
-        fileName:
-          `${video.title}.mp3`
-      },
-      {
-        quoted
-      }
-    );
-
-    await react(
-      jid,
-      quoted.key,
-      "✅"
-    );
-
-  } catch (error) {
-    console.error(
-      "PLAY ERROR:",
-      error.message
-    );
-
-    await sendText(
-      jid,
-      "❌ Impossible de télécharger cette musique."
-    );
   }
+
+  return {
+    buffer:
+      Buffer.concat(chunks),
+    title:
+      video.title,
+    url:
+      video.url
+  };
 }
 
-// ===============================
-// COMMAND HANDLER
-// ===============================
+/* =========================================================
+   PARSER
+========================================================= */
+
+function parseCommand(
+  text
+) {
+  if (
+    !text ||
+    !text.startsWith(
+      PREFIX
+    )
+  ) {
+    return null;
+  }
+
+  const body =
+    text.slice(
+      PREFIX.length
+    ).trim();
+
+  if (!body) {
+    return null;
+  }
+
+  const parts =
+    body.split(
+      /\s+/
+    );
+
+  const command =
+    parts
+      .shift()
+      .toLowerCase();
+
+  return {
+    command,
+    args: parts,
+    text:
+      parts.join(" ")
+  };
+}
+
+/* =========================================================
+   COMMAND HANDLER
+========================================================= */
 
 async function handleCommand(
   message,
   jid,
   sender,
-  parsed
+  command,
+  args,
+  text
 ) {
-  const {
-    command,
-    args,
-    text
-  } = parsed;
-
   switch (command) {
 
-    case "menu": {
-      const caption =
-        menuText();
+    /* ================= GENERAL ================= */
 
+    case "menu":
+    case "help":
+      await sendMenu(jid);
+      break;
+
+    case "alive":
       await sendImage(
         jid,
-        getCurrentTheme(
-          jid
-        ).menu,
-        caption,
-        {
-          quoted:
-            message
-        }
+        OFFICIAL_IMAGES.alive,
+        `🤖 ${BOT_NAME}\n\n✅ Bot actif\n⚡ Version ${VERSION}`
       );
-
-      if (
-        fs.existsSync(
-          MENU_MUSIC
-        )
-      ) {
-        await sock.sendMessage(
-          jid,
-          {
-            audio:
-              fs.readFileSync(
-                MENU_MUSIC
-              ),
-            mimetype:
-              "audio/mp4",
-            ptt: false,
-            fileName:
-              "NICOLAS-ULTRA-XMD-MENU.m4a"
-          },
-          {
-            quoted:
-              message
-          }
-        );
-      }
-
-      return;
-    }
-
-    case "alive": {
-      await sendImage(
-        jid,
-        getCurrentTheme(
-          jid
-        ).alive,
-        `╭━━〔 ${BOT_NAME} 〕━━╮\n\n` +
-        `🟢 Bot en ligne\n` +
-        `⚡ Version : ${VERSION}\n` +
-        `👑 Owner : ${OWNER_NAME}\n\n` +
-        `╰━━━━━━━━━━━━╯`,
-        {
-          quoted:
-            message
-        }
-      );
-
-      return;
-    }
+      break;
 
     case "ping": {
       const start =
@@ -1375,21 +1377,20 @@ async function handleCommand(
       await sendImage(
         jid,
         OFFICIAL_IMAGES.ping,
-        `🏓 Pong !\n\n⚡ ${speed} ms`,
-        {
-          quoted:
-            message
-        }
+        `🏓 PONG\n\n⚡ ${speed} ms`
       );
 
-      return;
+      break;
     }
 
     case "speed": {
       const start =
         Date.now();
 
-      await sleep(20);
+      await sendText(
+        jid,
+        "⚡ Calcul de la vitesse..."
+      );
 
       const speed =
         Date.now() -
@@ -1397,96 +1398,56 @@ async function handleCommand(
 
       await sendText(
         jid,
-        `⚡ Vitesse : ${speed} ms`
+        `🚀 SPEED\n\n⚡ ${speed} ms`
       );
 
-      return;
+      break;
     }
 
-    case "owner": {
-      if (!OWNER_NUMBER) {
-        return sendText(
-          jid,
-          "👑 Owner non configuré."
-        );
-      }
-
+    case "owner":
       await sendText(
         jid,
-        `👑 Voilà le dev du bot, bg : @${OWNER_NUMBER}\n\n` +
-        `Évite de lui chercher des noises hein 😂\n` +
-        `Il est tranquille, mais faut pas tester.\n\n` +
-        `Respect au patron 🍫🎻`,
-        {
-          mentions: [
-            OWNER_JID
-          ]
-        }
+        `👑 OWNER\n\nNom : ${OWNER_NAME}\nTelegram : ${OWNER_TELEGRAM}\nWhatsApp : ${OWNER_NUMBER || "Non configuré"}`
       );
+      break;
 
-      return;
-    }
-
-    case "repo": {
+    case "repo":
       await sendText(
         jid,
-        `💻 ${BOT_NAME}\n\n` +
-        `Version : ${VERSION}\n` +
-        `Framework : Baileys\n` +
-        `Créateur : ${OWNER_NAME}`
+        "🔗 NICOLAS ULTRA XMD\n\nRepository du projet disponible depuis la configuration du bot."
       );
+      break;
 
-      return;
-    }
-
-    case "help": {
+    case "list":
       await sendText(
         jid,
-        `╭━━〔 HELP 〕━━╮\n\n` +
-        `📦 Commandes : ${COMMANDS.length}\n` +
-        `⚙️ Prefix : ${PREFIX}\n` +
-        `🤖 Version : ${VERSION}\n\n` +
-        `Utilise ${PREFIX}list pour voir les commandes.\n` +
-        `Utilise ${PREFIX}menu pour le menu complet.\n\n` +
-        `╰━━━━━━━━━━━━╯`
+        buildMenu(jid)
       );
+      break;
 
-      return;
-    }
-
-    case "list": {
-      const textList =
-        COMMANDS
-          .map(
-            ([cmd, desc]) =>
-              `${PREFIX}${cmd} — ${desc}`
-          )
-          .join("\n");
-
-      await sendText(
-        jid,
-        `╭━━〔 COMMAND LIST 〕━━╮\n\n` +
-        `${textList}\n\n` +
-        `╰━━━━━━━━━━━━━━━━╯`
-      );
-
-      return;
-    }
+    /* ================= OWNER ================= */
 
     case "sudo": {
       if (
         !isOwner(sender)
       ) {
-        return sendText(
+        await sendText(
           jid,
-          "❌ Seul Nicolas peut gérer les sudo."
+          "❌ Cette commande est réservée au propriétaire."
         );
+        break;
       }
 
       const action =
         args[0]?.toLowerCase();
 
-      const sudo =
+      const target =
+        getTargetJid(
+          message,
+          args.slice(1)
+        );
+
+      const list =
         getSudo();
 
       if (
@@ -1494,433 +1455,310 @@ async function handleCommand(
       ) {
         await sendText(
           jid,
-          sudo.length
-            ? `👑 Sudo :\n\n${sudo.map(x => `• ${x}`).join("\n")}`
-            : "Aucun sudo."
+          list.length
+            ? `👑 SUDO LIST\n\n${list.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
+            : "❌ Aucun sudo."
         );
-
-        return;
+        break;
       }
 
-      const target =
-        getTargetJid(
-          message
-        );
-
       if (
-        !target &&
-        !args[1]
+        !target
       ) {
-        return sendText(
+        await sendText(
           jid,
-          `Usage :\n${PREFIX}sudo add @user\n${PREFIX}sudo del @user\n${PREFIX}sudo list`
+          `Usage : ${PREFIX}sudo add @user`
         );
+        break;
       }
 
       const number =
-        target
-          ? jidToNumber(
-              target
-            )
-          : normalizeNumber(
-              args[1]
-            );
+        jidToNumber(
+          target
+        );
 
       if (
         action === "add"
       ) {
         if (
-          !sudo.includes(
-            number
-          )
+          !list.includes(number)
         ) {
-          sudo.push(
-            number
-          );
+          list.push(number);
 
           writeJSON(
-            files.sudo,
-            sudo
+            SUDO_FILE,
+            list
           );
         }
 
         await sendText(
           jid,
-          `✅ ${number} est maintenant sudo.`
+          `✅ ${number} ajouté aux SUDO.`
         );
 
-        return;
-      }
-
-      if (
+      } else if (
         action === "del"
       ) {
-        const filtered =
-          sudo.filter(
-            x =>
-              normalizeNumber(
-                x
-              ) !==
-              normalizeNumber(
-                number
-              )
+        const index =
+          list.indexOf(number);
+
+        if (
+          index !== -1
+        ) {
+          list.splice(
+            index,
+            1
           );
 
-        writeJSON(
-          files.sudo,
-          filtered
-        );
+          writeJSON(
+            SUDO_FILE,
+            list
+          );
+        }
 
         await sendText(
           jid,
-          `✅ Sudo retiré : ${number}`
+          `✅ ${number} retiré des SUDO.`
         );
-
-        return;
       }
 
-      await sendText(
-        jid,
-        "❌ Action inconnue."
-      );
-
-      return;
+      break;
     }
 
-    case "pair": {
+    /*
+      Pair : commande d'information uniquement.
+      La connexion elle-même se fait automatiquement
+      au démarrage avec PAIRING_NUMBER.
+    */
+
+    case "pair":
+      await sendText(
+        jid,
+        `🔐 PAIRING CODE\n\nLe bot utilise uniquement le Pairing Code.\n\nNuméro configuré : ${
+          OWNER_NUMBER
+            ? "✅ Oui"
+            : "❌ Non"
+        }\n\nRedémarre le bot pour générer un nouveau code si nécessaire.`
+      );
+      break;
+
+    case "purge":
       if (
-        !hasOwnerAccess(
-          sender
-        )
+        !isOwner(sender)
       ) {
-        return sendText(
+        await sendText(
           jid,
-          "❌ Commande réservée au staff."
+          "❌ Owner uniquement."
         );
+        break;
       }
 
       await sendText(
         jid,
-        "🔐 Le système de pairing est lancé automatiquement au démarrage du bot."
+        "🧹 Nettoyage demandé.\n\n⚠️ Pour refaire complètement le pairing, supprime le dossier auth_info_baileys puis redémarre le bot."
       );
+      break;
 
-      return;
-    }
+    /* ================= GROUP ================= */
 
-    case "purge": {
+    case "add":
+    case "ban":
+    case "kick":
+    case "promote":
+    case "demote": {
       if (
-        !hasOwnerAccess(
-          sender
-        )
-      ) {
-        return sendText(
-          jid,
-          "❌ Commande réservée au propriétaire."
-        );
-      }
+        !(await requireGroup(jid))
+      ) break;
 
-      await sendText(
-        jid,
-        "🧹 Purge demandée."
-      );
-
-      return;
-    }
-
-    case "groupinfo": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
+        ))
+      ) break;
 
-      if (!metadata)
-        return;
-
-      await sendText(
-        jid,
-        `╭━━〔 GROUP INFO 〕━━╮\n\n` +
-        `🏷️ Nom : ${metadata.subject}\n` +
-        `👥 Membres : ${metadata.participants.length}\n` +
-        `👑 Admins : ${getGroupAdmins(metadata).length}\n\n` +
-        `╰━━━━━━━━━━━━━━━━╯`
-      );
-
-      return;
-    }
-
-    case "listadmin":
-    case "staff": {
       if (
-        !await requireGroup(
+        !(await isBotAdmin(
           jid
-        )
-      )
-        return;
+        ))
+      ) {
+        await sendText(
+          jid,
+          "❌ Je dois être admin pour faire ça."
+        );
+        break;
+      }
+
+      const target =
+        getTargetJid(
+          message,
+          args
+        );
+
+      if (!target) {
+        await sendText(
+          jid,
+          `Usage : ${PREFIX}${command} @user`
+        );
+        break;
+      }
+
+      try {
+        if (
+          command === "add"
+        ) {
+          await sock.groupParticipantsUpdate(
+            jid,
+            [target],
+            "add"
+          );
+        }
+
+        if (
+          command === "ban" ||
+          command === "kick"
+        ) {
+          await sock.groupParticipantsUpdate(
+            jid,
+            [target],
+            "remove"
+          );
+        }
+
+        if (
+          command === "promote"
+        ) {
+          await sock.groupParticipantsUpdate(
+            jid,
+            [target],
+            "promote"
+          );
+        }
+
+        if (
+          command === "demote"
+        ) {
+          await sock.groupParticipantsUpdate(
+            jid,
+            [target],
+            "demote"
+          );
+        }
+
+        await sendText(
+          jid,
+          `✅ Action ${command} effectuée.`
+        );
+      } catch (error) {
+        await sendText(
+          jid,
+          `❌ Impossible d'effectuer ${command}.`
+        );
+      }
+
+      break;
+    }
+
+    case "tag":
+    case "tagall": {
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
+          jid,
+          sender
+        ))
+      ) break;
 
       const metadata =
         await getGroupMetadata(
           jid
         );
 
-      const admins =
-        getGroupAdmins(
-          metadata
-        );
-
-      const list =
-        admins
-          .map(
-            x =>
-              `• ${cleanMention(x)}`
-          )
-          .join("\n");
-
-      await sendMention(
-        jid,
-        `👑 STAFF DU GROUPE\n\n${list}`,
-        admins
-      );
-
-      return;
-    }
-
-    case "tag": {
-      const metadata =
-        await requireAdmin(
-          jid,
-          sender
-        );
-
-      if (!metadata)
-        return;
-
-      const target =
-        getTargetJid(
-          message
-        );
-
-      if (!target) {
-        return sendText(
-          jid,
-          "❌ Mentionne quelqu'un."
-        );
-      }
-
-      await sendMention(
-        jid,
-        `👋 ${cleanMention(
-          target
-        )}`,
-        [target]
-      );
-
-      return;
-    }
-
-    case "tagall": {
-      const metadata =
-        await requireAdmin(
-          jid,
-          sender
-        );
-
-      if (!metadata)
-        return;
-
-      const mentions =
+      const participants =
         metadata.participants
-          .map(p => p.id);
-
-      const body =
-        args.length
-          ? args.join(" ")
-          : "📢 Tout le monde est appelé !";
-
-      const tagText =
-        mentions
           .map(
-            x =>
-              `@${jidToNumber(x)}`
-          )
-          .join(" ");
+            p => p.id
+          );
+
+      const messageText =
+        text ||
+        "📢 Mention générale";
 
       await sendMention(
         jid,
-        `${body}\n\n${tagText}`,
-        mentions
+        `${messageText}\n\n${participants
+          .map(cleanMention)
+          .join(" ")}`,
+        participants
       );
 
-      return;
+      break;
     }
 
-    case "add": {
-      const metadata =
-        await requireAdmin(
-          jid,
-          sender
-        );
-
-      if (!metadata)
-        return;
-
-      if (!args[0]) {
-        return sendText(
-          jid,
-          "❌ Donne le numéro à ajouter."
-        );
-      }
-
-      const number =
-        normalizeNumber(
-          args[0]
-        );
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [
-            `${number}@s.whatsapp.net`
-          ],
-          "add"
-        );
-
-        await sendText(
-          jid,
-          "✅ Membre ajouté."
-        );
-      } catch {
-        await sendText(
-          jid,
-          "❌ Impossible d'ajouter ce membre."
-        );
-      }
-
-      return;
-    }
-
-    case "kick":
-    case "ban": {
-      const metadata =
-        await requireAdmin(
-          jid,
-          sender
-        );
-
-      if (!metadata)
-        return;
-
-      const target =
-        getTargetJid(
-          message
-        );
-
-      if (!target) {
-        return sendText(
-          jid,
-          "❌ Mentionne le membre à retirer."
-        );
-      }
-
+    case "groupinfo": {
       if (
-        isOwner(target)
-      ) {
-        return sendText(
-          jid,
-          "💀 Tu veux virer Nicolas maintenant ? Non."
-        );
-      }
+        !(await requireGroup(jid))
+      ) break;
 
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [target],
-          "remove"
+      const metadata =
+        await getGroupMetadata(
+          jid
         );
 
-        await sendText(
-          jid,
-          `🛑 ${cleanMention(target)} a été retiré.`,
-          {
-            mentions: [
-              target
-            ]
-          }
-        );
-      } catch {
-        await sendText(
-          jid,
-          "❌ Impossible de retirer ce membre."
-        );
-      }
+      await sendText(
+        jid,
+        `╭━━〔 GROUP INFO 〕━━╮
+┃ 👥 Nom : ${metadata.subject}
+┃ 👤 Membres : ${metadata.participants.length}
+┃ 👑 Créateur : ${
+          metadata.owner
+            ? cleanMention(
+                metadata.owner
+              )
+            : "Inconnu"
+        }
+╰━━━━━━━━━━━━━━━━━━╯`
+      );
 
-      return;
+      break;
     }
 
-    case "promote":
-    case "demote": {
-      const metadata =
-        await requireAdmin(
-          jid,
-          sender
+    case "listadmin":
+    case "staff": {
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      const admins =
+        await getGroupAdmins(
+          jid
         );
 
-      if (!metadata)
-        return;
+      await sendMention(
+        jid,
+        `👑 ADMINS\n\n${admins
+          .map(cleanMention)
+          .join("\n")}`,
+        admins
+      );
 
-      const target =
-        getTargetJid(
-          message
-        );
-
-      if (!target) {
-        return sendText(
-          jid,
-          "❌ Mentionne le membre."
-        );
-      }
-
-      try {
-        await sock.groupParticipantsUpdate(
-          jid,
-          [target],
-          command ===
-          "promote"
-            ? "promote"
-            : "demote"
-        );
-
-        await sendText(
-          jid,
-          command ===
-          "promote"
-            ? `👑 ${cleanMention(target)} est maintenant admin.`
-            : `📉 ${cleanMention(target)} n'est plus admin.`,
-          {
-            mentions: [
-              target
-            ]
-          }
-        );
-      } catch {
-        await sendText(
-          jid,
-          "❌ Action impossible."
-        );
-      }
-
-      return;
+      break;
     }
 
     case "link": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
-
-      if (!metadata)
-        return;
+        ))
+      ) break;
 
       try {
         const code =
@@ -1930,7 +1768,7 @@ async function handleCommand(
 
         await sendText(
           jid,
-          `🔗 https://chat.whatsapp.com/${code}`
+          `🔗 Lien du groupe :\n\nhttps://chat.whatsapp.com/${code}`
         );
       } catch {
         await sendText(
@@ -1939,18 +1777,20 @@ async function handleCommand(
         );
       }
 
-      return;
+      break;
     }
 
     case "revoke": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
-
-      if (!metadata)
-        return;
+        ))
+      ) break;
 
       try {
         await sock.groupRevokeInvite(
@@ -1959,33 +1799,36 @@ async function handleCommand(
 
         await sendText(
           jid,
-          "✅ Nouveau lien généré."
+          "✅ Ancien lien révoqué."
         );
       } catch {
         await sendText(
           jid,
-          "❌ Impossible de réinitialiser le lien."
+          "❌ Impossible de révoquer le lien."
         );
       }
 
-      return;
+      break;
     }
 
     case "groupname": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
-
-      if (!metadata)
-        return;
+        ))
+      ) break;
 
       if (!text) {
-        return sendText(
+        await sendText(
           jid,
-          "Usage : .groupname Nouveau nom"
+          `Usage : ${PREFIX}groupname Nouveau nom`
         );
+        break;
       }
 
       try {
@@ -1996,7 +1839,7 @@ async function handleCommand(
 
         await sendText(
           jid,
-          `✅ Nouveau nom : ${text}`
+          "✅ Nom du groupe modifié."
         );
       } catch {
         await sendText(
@@ -2005,24 +1848,27 @@ async function handleCommand(
         );
       }
 
-      return;
+      break;
     }
 
     case "setgdesc": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
-
-      if (!metadata)
-        return;
+        ))
+      ) break;
 
       if (!text) {
-        return sendText(
+        await sendText(
           jid,
-          "Usage : .setgdesc nouvelle description"
+          `Usage : ${PREFIX}setgdesc nouvelle description`
         );
+        break;
       }
 
       try {
@@ -2042,484 +1888,408 @@ async function handleCommand(
         );
       }
 
-      return;
+      break;
     }
 
     case "left": {
       if (
-        !hasOwnerAccess(
-          sender
-        )
-      ) {
-        return sendText(
-          jid,
-          "❌ Seul le staff peut utiliser cette commande."
-        );
-      }
+        !(await requireGroup(jid))
+      ) break;
 
       if (
-        !isGroupJid(jid)
-      )
-        return;
+        !(await requireAdmin(
+          jid,
+          sender
+        ))
+      ) break;
 
       await sendText(
         jid,
-        "👋 Bon, je vous laisse les gars 😂"
+        "👋 Je quitte le groupe..."
       );
 
-      await sleep(1000);
+      await sleep(
+        1000
+      );
 
       await sock.groupLeave(
         jid
       );
 
-      return;
+      break;
     }
 
+    /* ================= PROTECTION ================= */
+
     case "antilink": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
+        ))
+      ) break;
 
-      if (!metadata)
-        return;
-
-      const action =
+      const value =
         args[0]?.toLowerCase();
 
       if (
-        action === "on"
+        ![
+          "on",
+          "off"
+        ].includes(value)
       ) {
-        setProtection(
-          jid,
-          "antilink",
-          true
-        );
-
         await sendText(
           jid,
-          "🛡️ Antilink activé."
+          `Usage : ${PREFIX}antilink on/off`
         );
-
-        return;
+        break;
       }
 
-      if (
-        action === "off"
-      ) {
-        setProtection(
-          jid,
-          "antilink",
-          false
-        );
-
-        await sendText(
-          jid,
-          "🛡️ Antilink désactivé."
-        );
-
-        return;
-      }
-
-      if (
-        ["kick", "delete"]
-          .includes(action)
-      ) {
-        setProtection(
-          jid,
-          "antilinkAction",
-          action
-        );
-
-        await sendText(
-          jid,
-          `🛡️ Action antilink : ${action}`
-        );
-
-        return;
-      }
-
-      const p =
-        getProtection(
-          jid
-        );
+      setProtection(
+        jid,
+        "antilink",
+        value === "on"
+      );
 
       await sendText(
         jid,
-        `🛡️ Antilink : ${p.antilink ? "ON" : "OFF"}\n` +
-        `⚙️ Action : ${p.antilinkAction}`
+        `🔗 Antilink : ${
+          value === "on"
+            ? "ACTIVÉ"
+            : "DÉSACTIVÉ"
+        }`
       );
 
-      return;
+      break;
     }
 
     case "antipromote": {
-      const metadata =
-        await requireAdmin(
+      if (
+        !(await requireGroup(jid))
+      ) break;
+
+      if (
+        !(await requireAdmin(
           jid,
           sender
-        );
+        ))
+      ) break;
 
-      if (!metadata)
-        return;
-
-      const action =
+      const value =
         args[0]?.toLowerCase();
 
       if (
-        action === "on"
+        ![
+          "on",
+          "off"
+        ].includes(value)
       ) {
-        setProtection(
-          jid,
-          "antipromote",
-          true
-        );
-
         await sendText(
           jid,
-          "🛡️ Antipromote activé."
+          `Usage : ${PREFIX}antipromote on/off`
         );
-
-        return;
+        break;
       }
 
-      if (
-        action === "off"
-      ) {
-        setProtection(
-          jid,
-          "antipromote",
-          false
-        );
-
-        await sendText(
-          jid,
-          "🛡️ Antipromote désactivé."
-        );
-
-        return;
-      }
-
-      const p =
-        getProtection(
-          jid
-        );
+      setProtection(
+        jid,
+        "antipromote",
+        value === "on"
+      );
 
       await sendText(
         jid,
-        `🛡️ Antipromote : ${p.antipromote ? "ON" : "OFF"}`
+        `🛡️ Antipromote : ${
+          value === "on"
+            ? "ACTIVÉ"
+            : "DÉSACTIVÉ"
+        }`
       );
 
-      return;
+      break;
     }
 
+    /* ================= AFK ================= */
+
     case "afk": {
-      if (
-        args[0] === "list"
-      ) {
-        const afk =
-          getAFK();
-
-        const entries =
-          Object.entries(
-            afk
-          );
-
-        await sendText(
-          jid,
-          entries.length
-            ? entries
-                .map(
-                  ([user, data]) =>
-                    `• @${jidToNumber(user)} — ${data.reason || "AFK"}`
-                )
-                .join("\n")
-            : "Personne n'est AFK."
-        );
-
-        return;
-      }
-
       const reason =
         text ||
-        "Je suis AFK.";
+        "Aucune raison";
 
       setAFK(
         sender,
-        {
-          reason,
-          time: Date.now()
-        }
+        reason
       );
 
       await sendText(
         jid,
-        `💤 AFK activé.\n\n${reason}`
+        `💤 @${jidToNumber(sender)} est maintenant AFK.\n\nRaison : ${reason}`,
+        {
+          mentions: [
+            sender
+          ]
+        }
       );
 
-      return;
+      break;
     }
+
+    /* ================= FANCY ================= */
 
     case "fancy": {
       if (!text) {
-        return sendText(
+        await sendText(
           jid,
-          "Usage : .fancy ton texte"
+          `Usage : ${PREFIX}fancy texte`
         );
+        break;
       }
 
       const style =
-        Number(args[0]) ||
-        1;
+        Number(
+          args[0]
+        );
 
-      const actualText =
-        Number.isNaN(
-          Number(args[0])
-        )
-          ? text
-          : args
-              .slice(1)
-              .join(" ");
+      const input =
+        Number.isInteger(style) &&
+        args.length > 1
+          ? args.slice(1).join(" ")
+          : text;
+
+      const selectedStyle =
+        Number.isInteger(style)
+          ? style
+          : 0;
 
       await sendText(
         jid,
         fancy(
-          actualText ||
-            text,
-          style
+          input,
+          selectedStyle
         )
       );
 
-      return;
+      break;
     }
+
+    /* ================= PINTEREST ================= */
 
     case "pinterest":
     case "pin": {
       if (!text) {
-        return sendText(
+        await sendText(
           jid,
-          "🔎 Donne une recherche.\nExemple : .pin anime pfp"
+          `Usage : ${PREFIX}${command} anime`
         );
+        break;
       }
 
-      await react(
-        jid,
-        message.key,
-        "🔍"
-      );
-
       try {
-        const images =
+        const results =
           await pinterestSearch(
             text
           );
 
         for (
-          const image of images
+          const item of results
         ) {
-          await sock.sendMessage(
+          const imageUrl =
+            item?.image ||
+            item?.url ||
+            item?.src;
+
+          if (!imageUrl) {
+            continue;
+          }
+
+          await sendImage(
             jid,
-            {
-              image: {
-                url: image
-              }
-            },
-            {
-              quoted:
-                message
-            }
+            imageUrl,
+            `📌 Pinterest\n\n${text}`
           );
-
-          await sleep(300);
         }
-
-        await react(
-          jid,
-          message.key,
-          "✅"
-        );
-
       } catch {
         await sendText(
           jid,
-          "❌ Aucun résultat Pinterest trouvé."
+          "❌ Impossible de récupérer les images Pinterest."
         );
       }
 
-      return;
+      break;
     }
 
-    case "couple": {
-      if (
-        !await requireGroup(
-          jid
-        )
-      )
-        return;
+    /* ================= PLAY / SONG ================= */
 
-      const metadata =
-        await getGroupMetadata(
-          jid
-        );
-
-      const members =
-        metadata.participants
-          .map(
-            p => p.id
-          )
-          .filter(
-            x =>
-              normalizeNumber(
-                jidToNumber(x)
-              ) !==
-              normalizeNumber(
-                jidToNumber(
-                  sock.user.id
-                )
-              )
-          );
-
-      if (
-        members.length < 2
-      ) {
-        return sendText(
+    case "play":
+    case "song": {
+      if (!text) {
+        await sendText(
           jid,
-          "❌ Pas assez de membres."
+          `Usage : ${PREFIX}${command} nom de la musique`
         );
+        break;
       }
-
-      const target1 =
-        getMentioned(
-          message
-        )[0];
-
-      const target2 =
-        getMentioned(
-          message
-        )[1];
-
-      if (
-        target1 &&
-        target2
-      ) {
-        const percentage =
-          Math.floor(
-            Math.random() *
-            101
-          );
-
-        await sendMention(
-          jid,
-          `💘 Compatibilité du jour :\n\n` +
-          `${cleanMention(target1)} ❤️ ${cleanMention(target2)}\n\n` +
-          `💞 Compatibilité : ${percentage}%\n\n` +
-          `😂 C'est juste pour rigoler hein.`,
-          [
-            target1,
-            target2
-          ]
-        );
-
-        return;
-      }
-
-      let a =
-        randomItem(
-          members
-        );
-
-      let b =
-        randomItem(
-          members
-        );
-
-      while (
-        b === a &&
-        members.length > 1
-      ) {
-        b =
-          randomItem(
-            members
-          );
-      }
-
-      await sendMention(
-        jid,
-        `💘 VOICI LES COUPLES DU JOUR 💘\n\n` +
-        `${cleanMention(a)} ❤️ ${cleanMention(b)}\n\n` +
-        `😂 Le hasard a parlé !`,
-        [a, b]
-      );
-
-      return;
-    }
-
-    case "couplepp": {
-      await react(
-        jid,
-        message.key,
-        "💞"
-      );
 
       try {
-        const images =
-          await pinterestSearch(
-            "anime couple pfp half half matching profile picture"
+        await sendText(
+          jid,
+          "🔎 Recherche de la musique..."
+        );
+
+        const result =
+          await youtubeAudio(
+            text
           );
 
-        const image =
-          randomItem(
-            images
+        await sendText(
+          jid,
+          `🎵 ${result.title}\n\n⏳ Envoi de l'audio...`
+        );
+
+        await sock.sendMessage(
+          jid,
+          {
+            audio:
+              result.buffer,
+            mimetype:
+              "audio/mpeg",
+            fileName:
+              `${result.title}.mp3`
+          }
+        );
+      } catch (
+        error
+      ) {
+        await sendText(
+          jid,
+          `❌ Erreur audio : ${
+            error.message
+          }`
+        );
+      }
+
+      break;
+    }
+
+    /* ================= KIKI ================= */
+
+    case "kiki":
+      await sendText(
+        jid,
+        "😂 Kiki est actuellement en mode ULTRA XMD."
+      );
+      break;
+
+    /* ================= TAKE ================= */
+
+    case "take": {
+      const quoted =
+        getQuoted(
+          message
+        );
+
+      if (
+        !quoted
+      ) {
+        await sendText(
+          jid,
+          "❌ Réponds à un sticker."
+        );
+        break;
+      }
+
+      const sticker =
+        quoted.stickerMessage;
+
+      if (
+        !sticker
+      ) {
+        await sendText(
+          jid,
+          "❌ Le message cité n'est pas un sticker."
+        );
+        break;
+      }
+
+      try {
+        const buffer =
+          await downloadMedia(
+            sticker,
+            "sticker"
           );
 
         await sock.sendMessage(
           jid,
           {
-            image: {
-              url: image
-            },
-            caption:
-              "💞 PFP couple anime matching"
-          },
-          {
-            quoted:
-              message
+            sticker: buffer
           }
+        );
+
+        await sendText(
+          jid,
+          "⏜͡︵🍓 ֺׅຶsαgᧉִ͞͞͞ ղіᥴׄ᥆ֹׅᥣαs ⵿ׄ͡ এ╰︶࣪࣪࣪࣪"
         );
       } catch {
         await sendText(
           jid,
-          "❌ Impossible de trouver une PFP couple pour le moment."
+          "❌ Impossible de récupérer le sticker."
         );
       }
 
-      return;
+      break;
     }
 
-    case "play":
-    case "song": {
-      if (!text) {
-        return sendText(
-          jid,
-          `🎵 Usage : ${PREFIX}${command} nom de la musique`
-        );
-      }
+    /* ================= TOURl ================= */
 
-      await playYouTube(
+    case "tourl": {
+      await sendText(
         jid,
-        text,
-        message
+        "🌐 Fonction TOURl prête pour intégration du service d'hébergement."
       );
-
-      return;
+      break;
     }
+
+    /* ================= SSWEB ================= */
+
+    case "ssweb": {
+      if (!text) {
+        await sendText(
+          jid,
+          `Usage : ${PREFIX}ssweb https://site.com`
+        );
+        break;
+      }
+
+      try {
+        const api =
+          `https://image.thum.io/get/fullpage/${encodeURIComponent(text)}`;
+
+        await sendImage(
+          jid,
+          api,
+          `🌐 Screenshot\n${text}`
+        );
+      } catch {
+        await sendText(
+          jid,
+          "❌ Impossible de faire la capture."
+        );
+      }
+
+      break;
+    }
+
+    /* ================= GETPP ================= */
 
     case "getpp": {
       const target =
         getTargetJid(
-          message
+          message,
+          args
         ) ||
         sender;
 
@@ -2530,105 +2300,45 @@ async function handleCommand(
             "image"
           );
 
-        await sock.sendMessage(
+        await sendImage(
           jid,
-          {
-            image: {
-              url
-            },
-            caption:
-              `🖼️ Photo de profil de @${jidToNumber(target)}`
-          },
-          {
-            quoted:
-              message,
-            mentions: [
-              target
-            ]
-          }
+          url,
+          `🖼️ Photo de profil de ${jidToNumber(target)}`
         );
       } catch {
         await sendText(
           jid,
-          "❌ Impossible de récupérer la photo de profil."
+          "❌ Cette personne n'a pas de photo de profil accessible."
         );
       }
 
-      return;
+      break;
     }
 
-    case "take": {
-      const quoted =
-        getQuoted(
-          message
-        );
-
-      if (
-        !quoted?.stickerMessage
-      ) {
-        return sendText(
-          jid,
-          "❌ Réponds à un sticker avec .take"
-        );
-      }
-
-      try {
-        const buffer =
-          await downloadMedia(
-            quoted,
-            "sticker"
-          );
-
-        if (!buffer) {
-          throw new Error(
-            "No sticker"
-          );
-        }
-
-        await sock.sendMessage(
-          jid,
-          {
-            sticker:
-              buffer
-          },
-          {
-            quoted:
-              message
-          }
-        );
-      } catch {
-        await sendText(
-          jid,
-          "❌ Impossible de récupérer le sticker."
-        );
-      }
-
-      return;
-    }
-
-    case "kiki": {
-      await sendText(
-        jid,
-        "😂 Kiki est dans la place."
-      );
-
-      return;
-    }
+    /* ================= DELETE ================= */
 
     case "delete": {
-      const context =
+      const quoted =
         getContext(
           message
         );
 
       if (
-        !context?.stanzaId
+        !quoted?.stanzaId
       ) {
-        return sendText(
+        await sendText(
           jid,
           "❌ Réponds au message à supprimer."
         );
+        break;
       }
+
+      if (
+        !(await requireAdmin(
+          jid,
+          sender
+        ))
+      ) break;
 
       try {
         await sock.sendMessage(
@@ -2640,9 +2350,9 @@ async function handleCommand(
               fromMe:
                 false,
               id:
-                context.stanzaId,
+                quoted.stanzaId,
               participant:
-                context.participant
+                quoted.participant
             }
           }
         );
@@ -2653,51 +2363,312 @@ async function handleCommand(
         );
       }
 
-      return;
+      break;
     }
 
-    case "theme": {
-      const requested =
-        args[0]?.toLowerCase();
+    /* ================= THEME ================= */
 
+    case "theme": {
       if (
-        !requested
+        !args[0]
       ) {
-        return sendText(
+        await sendText(
           jid,
-          `🎨 Thèmes disponibles :\n\n${THEMES.join(", ")}\n\n` +
-          `Utilise ${PREFIX}theme nom`
+          `🎭 THEMES DISPONIBLES\n\n${THEMES.join("\n")}\n\nUsage : ${PREFIX}theme naruto`
         );
+        break;
       }
 
+      const theme =
+        args[0].toLowerCase();
+
       if (
-        !setTheme(
-          jid,
-          requested
+        !THEMES.includes(
+          theme
         )
       ) {
-        return sendText(
+        await sendText(
           jid,
-          "❌ Thème inconnu."
+          `❌ Thème inconnu.\n\n${THEMES.join("\n")}`
         );
+        break;
       }
+
+      if (
+        isGroupJid(jid) &&
+        !(await requireAdmin(
+          jid,
+          sender
+        ))
+      ) {
+        break;
+      }
+
+      setTheme(
+        jid,
+        theme
+      );
 
       await sendText(
         jid,
-        `🎨 Thème changé : ${requested}`
+        `🎭 Thème changé : ${theme}`
       );
 
-      return;
+      break;
+    }
+
+    /* ================= COUPLE ================= */
+
+    case "couple":
+      await sendText(
+        jid,
+        `💞 COUPLE DU JOUR\n\n👑 ${OWNER_NAME} ❤️ ???`
+      );
+      break;
+
+    case "couplepp": {
+      const target =
+        getTargetJid(
+          message,
+          args
+        );
+
+      if (!target) {
+        await sendText(
+          jid,
+          `Usage : ${PREFIX}couplepp @user`
+        );
+        break;
+      }
+
+      try {
+        const url =
+          await sock.profilePictureUrl(
+            target,
+            "image"
+          );
+
+        await sendImage(
+          jid,
+          url,
+          "💞 Couple Profile"
+        );
+      } catch {
+        await sendText(
+          jid,
+          "💞 Couple Profile"
+        );
+      }
+
+      break;
     }
 
     default:
-      return;
+      await sendText(
+        jid,
+        `❌ Commande inconnue : ${PREFIX}${command}\n\nTape ${PREFIX}menu pour voir les commandes.`
+      );
   }
 }
 
-// ===============================
-// MESSAGE HANDLER
-// ===============================
+/* =========================================================
+   ANTILINK
+========================================================= */
+
+async function handleAntilink(
+  message,
+  jid,
+  sender,
+  text
+) {
+  if (
+    !isGroupJid(jid)
+  ) {
+    return false;
+  }
+
+  if (
+    !getProtection(
+      jid,
+      "antilink"
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    !text ||
+    !/(https?:\/\/|chat\.whatsapp\.com\/)/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    isOwner(sender) ||
+    (await isAdmin(
+      jid,
+      sender
+    ))
+  ) {
+    return false;
+  }
+
+  try {
+    await sock.sendMessage(
+      jid,
+      {
+        delete:
+          message.key
+      }
+    );
+  } catch {}
+
+  await sendText(
+    jid,
+    `🚫 @${jidToNumber(sender)} lien supprimé.`,
+    {
+      mentions: [
+        sender
+      ]
+    }
+  );
+
+  return true;
+}
+
+/* =========================================================
+   ANTIPROMOTE
+========================================================= */
+
+async function handleParticipantsUpdate(
+  update
+) {
+  const {
+    id,
+    participants,
+    action
+  } = update;
+
+  if (
+    action !== "promote"
+  ) {
+    return;
+  }
+
+  if (
+    !getProtection(
+      id,
+      "antipromote"
+    )
+  ) {
+    return;
+  }
+
+  if (
+    !participants?.length
+  ) {
+    return;
+  }
+
+  if (
+    !(await isBotAdmin(id))
+  ) {
+    return;
+  }
+
+  for (
+    const participant of participants
+  ) {
+    try {
+      await sock.groupParticipantsUpdate(
+        id,
+        [participant],
+        "demote"
+      );
+    } catch {}
+  }
+
+  await sendText(
+    id,
+    "🛡️ Antipromote : promotion annulée."
+  );
+}
+
+/* =========================================================
+   AFK DETECTION
+========================================================= */
+
+async function handleAFK(
+  jid,
+  sender,
+  message
+) {
+  const afk =
+    getAFK();
+
+  const mentioned =
+    getMentioned(
+      message
+    );
+
+  for (
+    const target of mentioned
+  ) {
+    if (
+      afk[target]
+    ) {
+      const info =
+        afk[target];
+
+      const duration =
+        formatDuration(
+          Math.floor(
+            (
+              Date.now() -
+              info.time
+            ) / 1000
+          )
+        );
+
+      await sendText(
+        jid,
+        `💤 @${jidToNumber(target)} est AFK.\n\n📝 ${info.reason}\n⏱️ Depuis : ${duration}`,
+        {
+          mentions: [
+            target
+          ]
+        }
+      );
+    }
+  }
+
+  if (
+    afk[sender]
+  ) {
+    const info =
+      afk[sender];
+
+    clearAFK(
+      sender
+    );
+
+    await sendText(
+      jid,
+      `👋 @${jidToNumber(sender)}, ton AFK est terminé.`,
+      {
+        mentions: [
+          sender
+        ]
+      }
+    );
+  }
+}
+
+/* =========================================================
+   MESSAGE HANDLER
+========================================================= */
 
 async function handleMessage(
   message
@@ -2705,19 +2676,23 @@ async function handleMessage(
   try {
     if (
       !message?.message
-    )
+    ) {
       return;
+    }
 
     if (
-      message.key.fromMe
-    )
+      message.key?.fromMe
+    ) {
       return;
+    }
 
     const jid =
-      message.key.remoteJid;
+      message.key
+        ?.remoteJid;
 
-    if (!jid)
+    if (!jid) {
       return;
+    }
 
     const sender =
       getSenderJid(
@@ -2729,102 +2704,21 @@ async function handleMessage(
         message
       );
 
-    const afk =
-      getAFK();
+    await handleAFK(
+      jid,
+      sender,
+      message
+    );
 
     if (
-      afk[sender]
-    ) {
-      const duration =
-        formatDuration(
-          (Date.now() -
-            afk[sender].time) /
-            1000
-        );
-
-      delete afk[sender];
-
-      writeJSON(
-        files.afk,
-        afk
-      );
-
-      await sendText(
+      await handleAntilink(
+        message,
         jid,
-        `👋 ${cleanMention(sender)} est de retour !\n` +
-        `⏱️ AFK : ${duration}`,
-        {
-          mentions: [
-            sender
-          ]
-        }
-      );
-    }
-
-    if (
-      isGroupJid(jid) &&
-      text
+        sender,
+        text
+      )
     ) {
-      const protection =
-        getProtection(
-          jid
-        );
-
-      if (
-        protection.antilink &&
-        /chat\.whatsapp\.com\/|https?:\/\/|www\./i.test(text)
-      ) {
-        const metadata =
-          await getGroupMetadata(
-            jid
-          );
-
-        if (
-          !isAdmin(
-            metadata,
-            sender
-          ) &&
-          !hasOwnerAccess(
-            sender
-          )
-        ) {
-          if (
-            protection.antilinkAction ===
-            "delete"
-          ) {
-            try {
-              await sock.sendMessage(
-                jid,
-                {
-                  delete:
-                    message.key
-                }
-              );
-            } catch {}
-          }
-
-          if (
-            protection.antilinkAction ===
-            "kick"
-          ) {
-            if (
-              isBotAdmin(
-                metadata
-              )
-            ) {
-              try {
-                await sock.groupParticipantsUpdate(
-                  jid,
-                  [sender],
-                  "remove"
-                );
-              } catch {}
-            }
-          }
-
-          return;
-        }
-      }
+      return;
     }
 
     const parsed =
@@ -2832,29 +2726,34 @@ async function handleMessage(
         text
       );
 
-    if (!parsed)
+    if (!parsed) {
       return;
+    }
 
     await handleCommand(
       message,
       jid,
       sender,
-      parsed
+      parsed.command,
+      parsed.args,
+      parsed.text
     );
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      "MESSAGE ERROR:",
+      "❌ Message error:",
       error
     );
   }
 }
 
-// ===============================
-// GROUP PARTICIPANTS
-// ===============================
+/* =========================================================
+   WELCOME / GOODBYE
+========================================================= */
 
-async function handleParticipants(
+async function handleGroupParticipants(
   update
 ) {
   try {
@@ -2865,140 +2764,123 @@ async function handleParticipants(
     } = update;
 
     if (
-      !["add", "remove"]
-        .includes(action)
+      !participants?.length
     ) {
       return;
     }
 
-    await getGroupMetadata(
-      id
-    );
-
-    const image =
+    if (
       action === "add"
-        ? OFFICIAL_IMAGES.welcome
-        : OFFICIAL_IMAGES.goodbye;
-
-    for (
-      const participant
-      of participants
     ) {
-      const name =
-        `@${jidToNumber(
-          participant
-        )}`;
-
-      const text =
-        action === "add"
-          ? `👋 Bienvenue ${name} dans le groupe !\n\n🔥 Amuse-toi bien avec ${BOT_NAME}.`
-          : `👋 ${name} nous quitte.\n\nÀ plus !`;
-
-      try {
-        await sock.sendMessage(
+      for (
+        const participant of participants
+      ) {
+        await sendImage(
           id,
-          {
-            image: {
-              url: image
-            },
-            caption: text,
-            mentions: [
-              participant
-            ]
-          }
+          OFFICIAL_IMAGES.welcome,
+          `🎉 Bienvenue @${jidToNumber(participant)} !\n\nBienvenue dans le groupe ${BOT_NAME}.`
         );
-      } catch {
-        try {
-          await sendMention(
-            id,
-            text,
-            [participant]
-          );
-        } catch {}
       }
     }
+
+    if (
+      action === "remove"
+    ) {
+      for (
+        const participant of participants
+      ) {
+        await sendImage(
+          id,
+          OFFICIAL_IMAGES.goodbye,
+          `👋 @${jidToNumber(participant)} a quitté le groupe.`
+        );
+      }
+    }
+
+    await handleParticipantsUpdate(
+      update
+    );
 
   } catch (
     error
   ) {
     console.error(
-      "PARTICIPANT ERROR:",
+      "❌ Participant error:",
       error
     );
   }
 }
 
-// ============================================================
-// PAIRING SYSTEM
-// ============================================================
+/* =========================================================
+   PAIRING CODE
+   ================================================
+
+   IMPORTANT :
+   - AUCUN QR CODE
+   - PAS DE qr event pour lancer le pairing
+   - UNE SEULE demande de pairing
+   - numéro uniquement en chiffres
+========================================================= */
 
 async function requestPairingCode(
+  currentSocket,
   state,
-  generation,
-  currentSocket
+  generation
 ) {
   if (
     state.creds.registered
   ) {
     console.log(
-      "🔐 Session WhatsApp déjà enregistrée."
+      "✅ Session WhatsApp déjà enregistrée."
     );
 
-    return false;
+    return;
   }
 
   if (
     pairingRequested ||
     pairingInProgress
   ) {
-    return false;
-  }
-
-  const pairingNumber =
-    normalizeNumber(
-      process.env.PAIRING_NUMBER ||
-      ""
-    );
-
-  if (!pairingNumber) {
-    console.error("");
-    console.error(
-      "❌ PAIRING_NUMBER est absent de Railway."
-    );
-    console.error(
-      "👉 Ajoute la variable PAIRING_NUMBER dans Railway."
-    );
-    console.error("");
-
-    return false;
+    return;
   }
 
   if (
-    pairingNumber.length < 8
+    generation !==
+    botGeneration
   ) {
-    console.error("");
-    console.error(
-      "❌ PAIRING_NUMBER semble invalide."
-    );
-    console.error(
-      "👉 Utilise le numéro international sans +, espaces ni tirets."
-    );
-    console.error("");
-
-    return false;
+    return;
   }
 
   if (
     !currentSocket ||
-    currentSocket !== sock
+    currentSocket !==
+    sock
   ) {
-    return false;
+    return;
   }
 
   if (
-    generation !== botGeneration
+    !OWNER_NUMBER
   ) {
-    return false;
+    console.error(
+      "❌ PAIRING_NUMBER manquant."
+    );
+
+    console.error(
+      "➡️ Ajoute PAIRING_NUMBER=242XXXXXXXXX dans Railway Variables."
+    );
+
+    return;
+  }
+
+  if (
+    OWNER_NUMBER.length < 8
+  ) {
+    console.error(
+      "❌ PAIRING_NUMBER invalide."
+    );
+
+    return;
   }
 
   pairingRequested =
@@ -3007,160 +2889,116 @@ async function requestPairingCode(
   pairingInProgress =
     true;
 
-  pairingSession =
-    true;
-
   try {
-    console.log("");
     console.log(
-      "⏳ Préparation du code de pairing..."
+      "🔐 Demande du Pairing Code..."
+    );
+
+    console.log(
+      `📱 Numéro : ${OWNER_NUMBER}`
     );
 
     /*
-     * IMPORTANT :
-     * On attend que le socket ait réellement
-     * initialisé le canal WhatsApp.
-     */
-    await sleep(1500);
+      Petit délai pour laisser le socket
+      initialiser sa connexion.
+    */
+    await sleep(
+      2500
+    );
 
     if (
-      generation !== botGeneration ||
-      currentSocket !== sock
+      generation !==
+      botGeneration
     ) {
-      return false;
+      return;
     }
 
     if (
       state.creds.registered
     ) {
-      console.log(
-        "✅ Session enregistrée avant le pairing."
-      );
-
-      return false;
+      return;
     }
-
-    console.log(
-      `📱 Numéro : ${pairingNumber}`
-    );
-
-    console.log(
-      "📱 Demande du code à WhatsApp..."
-    );
 
     const code =
       await currentSocket.requestPairingCode(
-        pairingNumber
+        OWNER_NUMBER
       );
 
-    if (
-      currentSocket !== sock ||
-      generation !== botGeneration
-    ) {
-      return false;
-    }
-
-    const cleanCode =
-      String(code || "")
-        .replace(/-/g, "")
-        .trim();
-
-    if (
-      !cleanCode
-    ) {
+    if (!code) {
       throw new Error(
         "WhatsApp n'a retourné aucun code."
       );
     }
 
-    const displayCode =
-      cleanCode.length === 8
-        ? `${cleanCode.slice(0, 4)}-${cleanCode.slice(4)}`
-        : cleanCode;
-
-    console.log("");
-    console.log(
-      "╔══════════════════════════════════════╗"
-    );
-    console.log(
-      "║       🔐 NICOLAS ULTRA XMD          ║"
-    );
-    console.log(
-      "║           PAIRING CODE              ║"
-    );
-    console.log(
-      "╠══════════════════════════════════════╣"
-    );
-    console.log(
-      `║             ${displayCode}             ║`
-    );
-    console.log(
-      "╠══════════════════════════════════════╣"
-    );
-    console.log(
-      "║ WhatsApp → Appareils connectés      ║"
-    );
-    console.log(
-      "║ → Connecter un appareil             ║"
-    );
-    console.log(
-      "║ → Avec un numéro de téléphone       ║"
-    );
-    console.log(
-      "╚══════════════════════════════════════╝"
-    );
-    console.log("");
+    const formatted =
+      String(code)
+        .replace(
+          /[^A-Z0-9]/gi,
+          ""
+        )
+        .match(
+          /.{1,4}/g
+        )
+        ?.join("-") ||
+      String(code);
 
     console.log(
-      "📱 ENTRE LE CODE MAINTENANT DANS WHATSAPP."
+      ""
+    );
+    console.log(
+      "╔══════════════════════════════════╗"
+    );
+    console.log(
+      "║     🔐 PAIRING CODE WHATSAPP     ║"
+    );
+    console.log(
+      "╠══════════════════════════════════╣"
+    );
+    console.log(
+      `║          ${formatted}             ║`
+    );
+    console.log(
+      "╠══════════════════════════════════╣"
+    );
+    console.log(
+      "║ WhatsApp > Appareils connectés   ║"
+    );
+    console.log(
+      "║ > Connecter un appareil           ║"
+    );
+    console.log(
+      "║ > Connecter avec numéro téléphone║"
+    );
+    console.log(
+      "╚══════════════════════════════════╝"
+    );
+    console.log(
+      ""
     );
 
     console.log(
-      "⏳ Ne redémarre PAS Railway pendant la liaison."
+      "⚠️ N'appelle pas .pair plusieurs fois."
     );
 
     console.log(
-      "⚠️ Un seul code sera demandé pour ce socket."
+      "⚠️ Utilise ce code une seule fois."
     );
 
-    console.log("");
-
-    return true;
-
-  } catch (error) {
-    const errorMessage =
-      error?.message ||
-      String(error);
-
-    console.error("");
+  } catch (
+    error
+  ) {
     console.error(
-      "❌ ERREUR PAIRING :",
-      errorMessage
+      "❌ Erreur Pairing Code :",
+      error?.message ||
+        error
+    );
+
+    console.error(
+      "ℹ️ Si WhatsApp affiche encore « code incorrect », supprime l'ancien dossier auth_info_baileys puis redémarre UNE seule fois."
     );
 
     pairingRequested =
       false;
-
-    pairingInProgress =
-      false;
-
-    /*
-     * Si WhatsApp ferme le canal immédiatement,
-     * on laisse connection.update décider quoi faire.
-     */
-    if (
-      /401|428|405|515|connection closed|connection failure|bad-request/i.test(
-        errorMessage
-      )
-    ) {
-      console.error(
-        "⚠️ WhatsApp a refusé/interrompu la demande de pairing."
-      );
-    }
-
-    console.error("");
-
-    return false;
 
   } finally {
     pairingInProgress =
@@ -3168,60 +3006,9 @@ async function requestPairingCode(
   }
 }
 
-// ============================================================
-// RECONNECT
-// ============================================================
-
-function scheduleReconnect(
-  delay = 5000
-) {
-  if (
-    reconnectTimer
-  ) {
-    return;
-  }
-
-  if (
-    pairingTimer
-  ) {
-    clearTimeout(
-      pairingTimer
-    );
-
-    pairingTimer =
-      null;
-  }
-
-  reconnectTimer =
-    setTimeout(
-      () => {
-        reconnectTimer =
-          null;
-
-        pairingRequested =
-          false;
-
-        pairingInProgress =
-          false;
-
-        pairingSession =
-          false;
-
-        console.log("");
-        console.log(
-          "🔄 Nouvelle tentative de connexion..."
-        );
-        console.log("");
-
-        startBot();
-      },
-      delay
-    );
-}
-
-// ============================================================
-// START BOT
-// ============================================================
+/* =========================================================
+   CONNECTION
+========================================================= */
 
 async function startBot() {
   if (
@@ -3233,14 +3020,12 @@ async function startBot() {
   starting =
     true;
 
+  botGeneration++;
+
   const generation =
-    ++botGeneration;
+    botGeneration;
 
   try {
-    // =========================
-    // AUTH
-    // =========================
-
     const {
       state,
       saveCreds
@@ -3249,10 +3034,6 @@ async function startBot() {
         AUTH_DIR
       );
 
-    // =========================
-    // VERSION WHATSAPP WEB
-    // =========================
-
     let version;
 
     try {
@@ -3260,89 +3041,47 @@ async function startBot() {
         await fetchLatestWaWebVersion();
 
       if (
-        waVersion &&
-        Array.isArray(
-          waVersion.version
-        )
+        waVersion?.version
       ) {
         version =
           waVersion.version;
 
-        console.log("");
         console.log(
-          `🌐 WhatsApp Web : ${version.join(".")}`
-        );
-
-        console.log(
-          `✅ Version actuelle : ${
-            waVersion.isLatest
-              ? "oui"
-              : "non"
-          }`
+          `🌐 WhatsApp Web version : ${version.join(".")}`
         );
       }
-
-    } catch (versionError) {
-      console.error(
-        "⚠️ Impossible de récupérer la version WhatsApp Web :",
-        versionError?.message ||
-        versionError
-      );
-
-      console.log(
-        "⚠️ Baileys utilisera sa version par défaut."
-      );
-
-      version =
-        undefined;
-    }
-
-    console.log("");
-    console.log(
-      `🚀 ${BOT_NAME} v${VERSION}`
-    );
-
-    console.log(
-      "🔧 Initialisation de WhatsApp..."
-    );
-
-    if (
-      state.creds.registered
+    } catch (
+      error
     ) {
       console.log(
-        "🔐 Session WhatsApp existante détectée."
-      );
-    } else {
-      console.log(
-        "🔐 Aucune session WhatsApp trouvée."
+        "⚠️ Impossible de récupérer la version WhatsApp Web, version Baileys par défaut utilisée."
       );
     }
 
-    // =========================
-    // SOCKET
-    // =========================
+    /*
+      IMPORTANT :
+      printQRInTerminal = false
+
+      On ne gère volontairement PAS
+      l'événement QR.
+    */
 
     const socketOptions = {
       auth: state,
 
-      logger: pino({
-        level:
-          "silent"
-      }),
+      logger:
+        pino({
+          level: "silent"
+        }),
 
-      /*
-       * QR désactivé.
-       *
-       * On utilise le QR interne de Baileys uniquement
-       * comme signal pour savoir que le canal de
-       * connexion est prêt pour le pairing code.
-       */
       printQRInTerminal:
         false,
 
       /*
-       * Browser canonique.
-       */
+        Navigateur canonique.
+        Évite les problèmes de pairing
+        liés aux labels personnalisés.
+      */
       browser:
         Browsers.macOS(
           "Desktop"
@@ -3374,46 +3113,53 @@ async function startBot() {
         version;
     }
 
-    const newSocket =
+    const currentSocket =
       makeWASocket(
         socketOptions
       );
 
     sock =
-      newSocket;
+      currentSocket;
 
-    // =========================
-    // SAVE CREDENTIALS
-    // =========================
-
-    sock.ev.on(
+    currentSocket.ev.on(
       "creds.update",
       saveCreds
     );
 
-    // ========================================================
-    // CONNECTION UPDATE
-    // ========================================================
+    currentSocket.ev.on(
+      "messages.upsert",
+      async ({
+        messages
+      }) => {
+        for (
+          const message of messages
+        ) {
+          await handleMessage(
+            message
+          );
+        }
+      }
+    );
 
-    sock.ev.on(
+    currentSocket.ev.on(
+      "group-participants.update",
+      handleGroupParticipants
+    );
+
+    currentSocket.ev.on(
       "connection.update",
       async update => {
-        if (
-          newSocket !== sock ||
-          generation !== botGeneration
-        ) {
-          return;
-        }
-
         const {
           connection,
-          lastDisconnect,
-          qr
+          lastDisconnect
         } = update;
 
-        // =====================
-        // CONNECTING
-        // =====================
+        /*
+          PAS DE QR ICI.
+
+          Même si WhatsApp envoie un événement qr,
+          le bot l'ignore volontairement.
+        */
 
         if (
           connection ===
@@ -3424,576 +3170,280 @@ async function startBot() {
           );
 
           /*
-           * IMPORTANT :
-           *
-           * NE PAS demander le pairing ici.
-           *
-           * WhatsApp peut encore être en train
-           * d'initialiser le canal.
-           */
-          return;
-        }
-
-        // ==================================================
-        // QR SIGNAL → PAIRING CODE
-        // ==================================================
-
-        if (
-          qr &&
-          !state.creds.registered &&
-          !pairingRequested &&
-          !pairingInProgress &&
-          !pairingTimer
-        ) {
-          /*
-           * On NE montre PAS le QR.
-           *
-           * Le QR sert uniquement de signal interne :
-           * le socket a maintenant suffisamment initialisé
-           * son canal pour demander le pairing code.
-           */
-
-          pairingTimer =
-            setTimeout(
-              async () => {
-                pairingTimer =
-                  null;
-
-                if (
-                  newSocket !== sock ||
-                  generation !== botGeneration
-                ) {
-                  return;
-                }
-
-                if (
-                  state.creds.registered
-                ) {
-                  return;
-                }
-
-                if (
-                  pairingRequested ||
-                  pairingInProgress
-                ) {
-                  return;
-                }
-
-                await requestPairingCode(
-                  state,
-                  generation,
-                  newSocket
-                );
-              },
-              800
+            Le Pairing Code est lancé directement,
+            sans attendre le QR.
+          */
+          if (
+            !state.creds.registered &&
+            !pairingRequested &&
+            generation ===
+              botGeneration
+          ) {
+            requestPairingCode(
+              currentSocket,
+              state,
+              generation
+            ).catch(
+              error =>
+                console.error(
+                  "❌ Pairing:",
+                  error
+                )
             );
-
-          return;
+          }
         }
-
-        // =====================
-        // CONNECTÉ
-        // =====================
 
         if (
           connection ===
           "open"
         ) {
-          if (
-            pairingTimer
-          ) {
-            clearTimeout(
-              pairingTimer
-            );
+          console.log(
+            ""
+          );
 
-            pairingTimer =
-              null;
-          }
+          console.log(
+            "╔══════════════════════════════════╗"
+          );
 
-          console.log("");
           console.log(
-            "╔══════════════════════════════════════╗"
+            "║   🚀 NICOLAS ULTRA XMD ONLINE   ║"
           );
-          console.log(
-            "║     🟢 NICOLAS ULTRA XMD CONNECTÉ  ║"
-          );
-          console.log(
-            `║              v${VERSION}              ║`
-          );
-          console.log(
-            "╚══════════════════════════════════════╝"
-          );
-          console.log("");
 
-          starting =
-            false;
+          console.log(
+            "╠══════════════════════════════════╣"
+          );
+
+          console.log(
+            `║ Version : ${VERSION}`
+          );
+
+          console.log(
+            "║ Connexion : PAIRING CODE"
+          );
+
+          console.log(
+            "║ QR Code : DÉSACTIVÉ"
+          );
+
+          console.log(
+            "╚══════════════════════════════════╝"
+          );
+
+          console.log(
+            ""
+          );
 
           pairingRequested =
             false;
 
           pairingInProgress =
             false;
-
-          pairingSession =
-            false;
-
-          if (
-            reconnectTimer
-          ) {
-            clearTimeout(
-              reconnectTimer
-            );
-
-            reconnectTimer =
-              null;
-          }
-
-          return;
         }
-
-        // =====================
-        // FERMÉ
-        // =====================
 
         if (
           connection ===
           "close"
         ) {
-          starting =
-            false;
-
-          if (
-            pairingTimer
-          ) {
-            clearTimeout(
-              pairingTimer
-            );
-
-            pairingTimer =
-              null;
-          }
-
           const statusCode =
             lastDisconnect
               ?.error
               ?.output
               ?.statusCode;
 
-          const errorMessage =
-            lastDisconnect
-              ?.error
-              ?.message ||
-            "";
-
-          console.log("");
-
-          console.log(
-            `❌ Connexion fermée : ${
-              statusCode ||
-              "inconnu"
-            }`
+          console.error(
+            `❌ Connexion fermée : ${statusCode || "inconnue"}`
           );
 
-          if (
-            errorMessage
-          ) {
-            console.log(
-              `⚠️ ${errorMessage}`
-            );
-          }
-
-          // ===================
-          // SESSION INVALIDÉE
-          // ===================
-
+          /*
+            Session volontairement déconnectée.
+          */
           if (
             statusCode ===
             DisconnectReason.loggedOut
           ) {
-            console.log("");
-
-            if (
-              state.creds.registered
-            ) {
-              console.log(
-                "🔴 SESSION WHATSAPP INVALIDÉE."
-              );
-
-              console.log(
-                "🧹 Cette session enregistrée n'est plus valide."
-              );
-
-              console.log(
-                `📁 AUTH : ${AUTH_DIR}`
-              );
-
-              console.log(
-                "➡️ Supprime l'ancienne session uniquement si nécessaire."
-              );
-
-              console.log("");
-
-              return;
-            }
-
-            /*
-             * Premier pairing :
-             * on NE supprime PAS les fichiers auth.
-             */
-            console.log(
-              "⚠️ WhatsApp a fermé le premier pairing."
+            console.error(
+              "🚫 Session WhatsApp déconnectée."
             );
 
-            pairingRequested =
-              false;
+            console.error(
+              "➡️ Supprime auth_info_baileys puis refais le pairing si nécessaire."
+            );
 
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            /*
-             * IMPORTANT :
-             *
-             * Pas de boucle agressive après 401.
-             * Une succession de nouveaux sockets peut
-             * empirer le refus côté WhatsApp.
-             */
             return;
           }
 
-          // ===================
-          // 401 PREMIER PAIRING
-          // ===================
-
+          /*
+            Si le premier pairing échoue avec 401,
+            on ne spamme pas WhatsApp avec des
+            demandes automatiques.
+          */
           if (
-            statusCode ===
-              401 &&
+            statusCode === 401 &&
             !state.creds.registered
           ) {
-            console.log("");
-            console.log(
-              "⚠️ 401 pendant le premier pairing."
+            console.error(
+              "⚠️ WhatsApp a fermé la tentative de pairing."
             );
 
-            console.log(
-              "❌ WhatsApp a fermé le socket après la demande du code."
+            console.error(
+              "⚠️ Aucun nouveau pairing automatique ne sera lancé."
             );
 
-            console.log(
-              "⚠️ Le code de ce socket est désormais invalide."
-            );
-
-            console.log(
-              "🛑 Arrêt de la boucle automatique pour éviter les demandes répétées."
-            );
-
-            console.log("");
-
-            pairingRequested =
-              false;
-
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            /*
-             * PAS DE RECONNECT AUTOMATIQUE ICI.
-             *
-             * Si WhatsApp rejette réellement le canal de
-             * pairing, recréer immédiatement des sockets
-             * ne force pas WhatsApp à accepter le code.
-             */
             return;
           }
 
-          // ===================
-          // 408
-          // ===================
-
+          /*
+            Reconnexion normale.
+          */
           if (
-            statusCode ===
-            408
+            !reconnectTimer
           ) {
-            console.log("");
-            console.log(
-              "⚠️ Timeout WhatsApp (408)."
-            );
+            const delay =
+              statusCode ===
+              515
+                ? 5000
+                : 3000;
 
             console.log(
-              "🔄 Reconnexion..."
+              `🔄 Reconnexion dans ${delay / 1000}s...`
             );
 
-            console.log("");
+            reconnectTimer =
+              setTimeout(
+                async () => {
+                  reconnectTimer =
+                    null;
 
-            pairingRequested =
-              false;
+                  pairingRequested =
+                    false;
 
-            pairingInProgress =
-              false;
+                  pairingInProgress =
+                    false;
 
-            pairingSession =
-              false;
+                  starting =
+                    false;
 
-            scheduleReconnect(
-              7000
-            );
-
-            return;
+                  await startBot();
+                },
+                delay
+              );
           }
-
-          // ===================
-          // 428
-          // ===================
-
-          if (
-            statusCode ===
-            428
-          ) {
-            console.log("");
-            console.log(
-              "⚠️ WhatsApp a fermé la connexion avec 428."
-            );
-
-            console.log(
-              "🔄 Nouvelle tentative."
-            );
-
-            console.log("");
-
-            pairingRequested =
-              false;
-
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            scheduleReconnect(
-              7000
-            );
-
-            return;
-          }
-
-          // ===================
-          // 405
-          // ===================
-
-          if (
-            statusCode ===
-            405
-          ) {
-            console.log("");
-            console.log(
-              "⚠️ WhatsApp a refusé la version/client."
-            );
-
-            console.log(
-              "🌐 Une nouvelle version WhatsApp Web sera récupérée."
-            );
-
-            console.log("");
-
-            pairingRequested =
-              false;
-
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            scheduleReconnect(
-              10000
-            );
-
-            return;
-          }
-
-          // ===================
-          // 515
-          // ===================
-
-          if (
-            statusCode ===
-            515
-          ) {
-            console.log("");
-            console.log(
-              "⚠️ WhatsApp demande un redémarrage du socket (515)."
-            );
-
-            console.log(
-              "🔄 Redémarrage propre..."
-            );
-
-            console.log("");
-
-            pairingRequested =
-              false;
-
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            scheduleReconnect(
-              5000
-            );
-
-            return;
-          }
-
-          // ===================
-          // RESTART REQUIRED
-          // ===================
-
-          if (
-            statusCode ===
-            DisconnectReason.restartRequired
-          ) {
-            console.log(
-              "🔄 WhatsApp demande un redémarrage du socket."
-            );
-
-            pairingRequested =
-              false;
-
-            pairingInProgress =
-              false;
-
-            pairingSession =
-              false;
-
-            scheduleReconnect(
-              4000
-            );
-
-            return;
-          }
-
-          // ===================
-          // RECONNEXION NORMALE
-          // ===================
-
-          pairingRequested =
-            false;
-
-          pairingInProgress =
-            false;
-
-          pairingSession =
-            false;
-
-          scheduleReconnect(
-            6000
-          );
         }
       }
     );
 
-    // =========================
-    // MESSAGES
-    // =========================
-
-    sock.ev.on(
-      "messages.upsert",
-      async ({
-        messages,
-        type
-      }) => {
-        if (
-          type !== "notify"
-        ) {
-          return;
-        }
-
-        for (
-          const message
-          of messages
-        ) {
-          await handleMessage(
-            message
-          );
-        }
-      }
-    );
-
-    // =========================
-    // GROUP PARTICIPANTS
-    // =========================
-
-    sock.ev.on(
-      "group-participants.update",
-      handleParticipants
-    );
+    /*
+      Si une session existe déjà,
+      aucune demande de pairing.
+    */
 
     if (
       state.creds.registered
     ) {
       console.log(
-        "🔐 Session WhatsApp existante : connexion automatique."
+        "🔐 Session existante détectée."
       );
     }
 
-    starting =
-      false;
-
-  } catch (error) {
-    starting =
-      false;
-
-    console.error("");
-
+  } catch (
+    error
+  ) {
     console.error(
-      "❌ START ERROR :",
-      error?.message ||
+      "❌ Erreur démarrage :",
       error
     );
 
-    console.error("");
+    starting =
+      false;
 
     if (
-      pairingTimer
+      !reconnectTimer
     ) {
-      clearTimeout(
-        pairingTimer
-      );
+      reconnectTimer =
+        setTimeout(
+          async () => {
+            reconnectTimer =
+              null;
 
-      pairingTimer =
-        null;
+            starting =
+              false;
+
+            await startBot();
+          },
+          5000
+        );
     }
 
-    pairingRequested =
-      false;
-
-    pairingInProgress =
-      false;
-
-    pairingSession =
-      false;
-
-    scheduleReconnect(
-      10000
-    );
+    return;
   }
+
+  starting =
+    false;
 }
 
-// ===============================
-// GLOBAL ERRORS
-// ===============================
+/* =========================================================
+   STARTUP
+========================================================= */
+
+console.log(
+  ""
+);
+
+console.log(
+  "╔══════════════════════════════════════╗"
+);
+
+console.log(
+  "║       NICOLAS ULTRA XMD v3.0.0       ║"
+);
+
+console.log(
+  "╠══════════════════════════════════════╣"
+);
+
+console.log(
+  "║ 🔐 CONNEXION : PAIRING CODE ONLY     ║"
+);
+
+console.log(
+  "║ 🚫 QR CODE : DÉSACTIVÉ                ║"
+);
+
+console.log(
+  "╚══════════════════════════════════════╝"
+);
+
+console.log(
+  ""
+);
+
+if (
+  OWNER_NUMBER
+) {
+  console.log(
+    `📱 Numéro de pairing configuré : ${OWNER_NUMBER}`
+  );
+} else {
+  console.log(
+    "⚠️ Aucun PAIRING_NUMBER configuré."
+  );
+}
+
+console.log(
+  ""
+);
+
+startBot();
+
+/* =========================================================
+   GLOBAL ERRORS
+========================================================= */
 
 process.on(
   "uncaughtException",
   error => {
     console.error(
-      "UNCAUGHT:",
+      "❌ uncaughtException:",
       error
     );
   }
@@ -4003,34 +3453,8 @@ process.on(
   "unhandledRejection",
   error => {
     console.error(
-      "REJECTION:",
+      "❌ unhandledRejection:",
       error
     );
   }
 );
-
-// ===============================
-// START
-// ===============================
-
-console.log("");
-console.log(
-  `🚀 ${BOT_NAME} v${VERSION}`
-);
-console.log("");
-
-if (
-  !process.env.PAIRING_NUMBER
-) {
-  console.error(
-    "⚠️ PAIRING_NUMBER n'est pas défini dans Railway."
-  );
-} else {
-  console.log(
-    "📱 PAIRING_NUMBER détecté."
-  );
-}
-
-console.log("");
-
-startBot();
